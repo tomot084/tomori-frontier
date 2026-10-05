@@ -1,3 +1,4 @@
+import { marketPoint } from "./investments";
 import { buildingData, gatherableData } from "./data";
 import type { GameModel, Point } from "./simulation";
 export interface LanternWorker extends Point {
@@ -10,6 +11,7 @@ export interface LanternWorker extends Point {
   targetId: string;
   clock: number;
   heading: number;
+  destination: "build" | "market";
 }
 /** Hired carriers harvest for construction; player inventory is never spent. */
 export class LanternCrew {
@@ -25,15 +27,21 @@ export class LanternCrew {
     targetId: "",
     clock: 0,
     heading: 0,
+    destination: "build" as const,
   }));
   constructor(private game: GameModel) {}
   step(dt: number) {
     const g = this.game,
-      zone = g.s.zone;
+      currentZone = g.s.zone;
     for (const w of this.workers) {
-      if (g.s.zone !== zone) break;
+      if (g.s.zone !== currentZone) break;
+      if (!w.cargo && !w.targetId)
+        w.destination = g.investments.economy.route ?? "build";
+      const market = w.destination === "market",
+        zone = market ? 0 : currentZone;
       w.active =
-        (g.s.economy?.carriers ?? Math.min(2, zone)) > w.id && zone < 3;
+        (g.s.economy?.carriers ?? Math.min(2, zone)) > w.id &&
+        (market || zone < 3);
       if (!w.active) continue;
       if (w.zone !== zone) {
         Object.assign(w, {
@@ -53,7 +61,7 @@ export class LanternCrew {
           dy = p.y - w.y,
           d = Math.hypot(dx, dy);
         w.heading = Math.atan2(dx, -dy);
-        const amount = Math.min(d, dt * 155);
+        const amount = Math.min(d, dt * 155 * g.investments.workerSpeed);
         if (d > 0) {
           w.x += (dx / d) * amount;
           w.y += (dy / d) * amount;
@@ -63,9 +71,13 @@ export class LanternCrew {
       if (w.phase === "search" || w.phase === "rest") {
         w.clock -= dt;
         if (w.clock > 0) continue;
-        const kinds = (["wood", "stone"] as const)
-          .filter((k) => progress[k] < b.cost[k])
-          .sort((a, c) => progress[a] / b.cost[a] - progress[c] / b.cost[c]);
+        const kinds = market
+          ? (["wood"] as ("wood" | "stone")[])
+          : (["wood", "stone"] as const)
+              .filter((k) => progress[k] < b.cost[k])
+              .sort(
+                (a, c) => progress[a] / b.cost[a] - progress[c] / b.cost[c],
+              );
         if (w.id === 1 && kinds.includes("stone"))
           kinds.sort((k) => (k === "stone" ? -1 : 1));
         const nodes = g.nodes.filter(
@@ -112,7 +124,9 @@ export class LanternCrew {
           if (w.clock >= (w.kind === "wood" ? 1.8 : 2.3)) {
             n.hp = 0;
             n.dead = g.time + gatherableData[n.kind].respawn * 1000;
-            w.cargo = gatherableData[n.kind].yield;
+            w.cargo =
+              gatherableData[n.kind].yield +
+              g.investments.resourceBonus(n.kind);
             g.event("death", n, { id: n.id, kind: n.kind });
             g.burst(n, w.kind === "wood" ? 0xe4b577 : 0xbcd9db, 5);
             w.targetId = "";
@@ -120,11 +134,19 @@ export class LanternCrew {
             w.clock = 0;
           }
         }
-      } else if (w.phase === "deliver" && walk({ x: 450, y: b.y - 45 })) {
+      } else if (
+        w.phase === "deliver" &&
+        walk(market ? marketPoint : { x: 450, y: b.y - 45 })
+      ) {
         w.clock += dt;
         if (w.clock >= 0.18) {
           w.clock = 0;
-          if (progress[w.kind] < b.cost[w.kind]) {
+          if (market) {
+            if (g.investments.economy.stock >= g.investments.storageCapacity)
+              continue;
+            g.investments.economy.stock++;
+            g.burst(marketPoint, 0xe4b577, 1);
+          } else if (progress[w.kind] < b.cost[w.kind]) {
             progress[w.kind]++;
             g.event("deposit", w, { kind: w.kind, index: zone });
             g.rewardConstruction(zone);

@@ -113,13 +113,12 @@ export class GameModel {
     // Keep the hub's investment pads free of trees; retain node IDs and resource supply.
     for (const n of this.nodes) {
       if (
-        n.zone === 0 &&
-        [...investmentTiles, customerPoint].some(
-          (t) => Math.hypot(n.x - t.x, n.y - t.y) < 82,
-        )
+        [...investmentTiles, customerPoint]
+          .filter((t) => t.y >= 190 + n.zone * 550 && t.y < 730 + n.zone * 550)
+          .some((t) => Math.hypot(n.x - t.x, n.y - t.y) < 82)
       ) {
         n.x = n.x < 450 ? 150 : 785;
-        n.y = Math.min(610, n.y + 38);
+        n.y = Math.min(610 + n.zone * 550, n.y + 38);
       }
     }
     for (let z = 1; z <= 2; z++)
@@ -346,7 +345,9 @@ export class GameModel {
           this.spawn(
             n,
             n.kind,
-            gatherableData[n.kind].yield + (this.s.zone >= 2 ? 2 : 0),
+            gatherableData[n.kind].yield +
+              (this.s.zone >= 2 ? 2 : 0) +
+              this.investments.resourceBonus(n.kind),
           );
           this.event("death", n, { id: n.id, kind: n.kind });
           if (!this.s.resources.wood && n.kind === "wood")
@@ -414,7 +415,11 @@ export class GameModel {
         e.dead = time + 24000;
         this.s.kills++;
         this.event("death", e, { id: e.id, kind: "enemy" });
-        this.spawn(e, "coin", enemyData[e.type].drop);
+        this.spawn(
+          e,
+          "coin",
+          enemyData[e.type].drop + this.investments.level("bounty") * 2,
+        );
         this.spawn(e, "food", 2);
         this.burst(e, 0xffdc88, 12);
         if (this.s.kills === 1)
@@ -435,7 +440,10 @@ export class GameModel {
         d.x += d.vx * dt;
         d.y += d.vy * dt;
         d.vy += 300 * dt;
-      } else if (distance < 160 && this.s.resources[d.kind] < cap) {
+      } else if (
+        distance < 160 + this.investments.level("magnet") * 40 &&
+        this.s.resources[d.kind] < cap
+      ) {
         const move = Math.min(distance, dt * (180 + d.age * 80));
         d.x += ((p.x - d.x) / Math.max(1, distance)) * move;
         d.y += ((p.y - d.y) / Math.max(1, distance)) * move;

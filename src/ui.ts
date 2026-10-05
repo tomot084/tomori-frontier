@@ -8,7 +8,14 @@ import {
   type Upgrade,
 } from "./data";
 import { GameModel } from "./simulation";
-import { investmentTiles, marketPoint, type Investment } from "./investments";
+import {
+  investmentTiles,
+  marketPoint,
+  investmentGroups,
+  investmentGroup,
+  type InvestmentGroup,
+  type Investment,
+} from "./investments";
 const svg = (body: string) =>
   `<svg viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
 export const icons: Record<Resource, string> = {
@@ -27,6 +34,7 @@ export const icons: Record<Resource, string> = {
 };
 export const el = (id: string) => document.getElementById(id)!;
 export class GameUI {
+  investmentFilter: InvestmentGroup = "すべて";
   investmentOpen = false;
   selectedInvestment: Investment | null = null;
   investmentKey = "";
@@ -49,6 +57,26 @@ export class GameUI {
     public model: GameModel,
     private buy: (u: Upgrade) => void,
   ) {
+    el("investment-filters").onclick = (event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>(
+        "button[data-filter]",
+      );
+      if (button) {
+        this.investmentFilter = button.dataset.filter as InvestmentGroup;
+        this.investmentKey = "";
+        this.update(true);
+      }
+    };
+    el("crew-routing").onclick = (event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>(
+        "button[data-route]",
+      );
+      if (button) {
+        model.investments.setRoute(button.dataset.route as "build" | "market");
+        this.investmentKey = "";
+        this.update(true);
+      }
+    };
     el("invest-toggle").onclick = () => this.openInvestments(null);
     el("invest-return").onclick = () => {
       model.investments.focus = null;
@@ -98,6 +126,7 @@ export class GameUI {
   openInvestments(id: Investment | null) {
     this.toggleShop(false);
     this.selectedInvestment = id;
+    this.investmentFilter = "すべて";
     this.investmentOpen = true;
     this.investmentKey = "";
     el("investment-panel").hidden = false;
@@ -152,20 +181,66 @@ export class GameUI {
       s.resources,
       nearest?.id,
       this.selectedInvestment,
+      this.investmentFilter,
     ]);
     if (this.investmentOpen && investmentKey !== this.investmentKey) {
       this.investmentKey = investmentKey;
+      const catalog = [...investmentTiles].sort(
+        (a, b) =>
+          [
+            "tool",
+            "sawmill",
+            "carrier",
+            "quarry",
+            "market",
+            "cart",
+            "basket",
+            "waiter",
+            "depot",
+            "magnet",
+            "bounty",
+          ].indexOf(a.id) -
+          [
+            "tool",
+            "sawmill",
+            "carrier",
+            "quarry",
+            "market",
+            "cart",
+            "basket",
+            "waiter",
+            "depot",
+            "magnet",
+            "bounty",
+          ].indexOf(b.id),
+      );
       const items = this.selectedInvestment
         ? investmentTiles.filter((t) => t.id === this.selectedInvestment)
-        : investmentTiles;
+        : catalog.filter(
+            (t) =>
+              this.investmentFilter === "すべて" ||
+              investmentGroup(t.id) === this.investmentFilter,
+          );
+      el("investment-filters").hidden = !!this.selectedInvestment;
+      el("investment-filters").innerHTML = investmentGroups
+        .map(
+          (group) =>
+            `<button data-filter="${group}" aria-pressed="${group === this.investmentFilter}">${group}</button>`,
+        )
+        .join("");
+      el("crew-routing").innerHTML =
+        this.selectedInvestment === "carrier" && economy.carriers > 0
+          ? `<div class="market-card"><b>運搬精霊の届け先</b><p>建築を進めるか、市場に木を集めるか。進行中の仕事を届け終えてから切り替えます。</p><div class="route-options"><button data-route="build" aria-pressed="${economy.route !== "market"}">建築へ</button><button data-route="market" aria-pressed="${economy.route === "market"}">市場へ</button></div>${economy.route === "market" && !economy.waiter ? "<p>配達係を雇うと、集めた木を自動で販売できます。</p>" : ""}</div>`
+          : "";
       el("investment-options").innerHTML = items
         .map((t) => {
           const o = system.offer(t.id),
             nearby =
               Math.hypot(t.x - this.model.player.x, t.y - this.model.player.y) <
               100;
-          const max = o.level >= o.max;
-          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}体` : t.id === "waiter" ? (o.level ? "雇用済" : "未雇用") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${max ? "MAX" : nearby ? `✦ ${o.price} で${t.id === "carrier" || t.id === "waiter" ? "雇う" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
+          const max = o.level >= o.max,
+            locked = s.zone < o.unlock;
+          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}体` : t.id === "waiter" ? (o.level ? "雇用済" : "未雇用") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${locked || max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${locked ? `✦ ${o.price}<small>橋の完成で解放</small>` : max ? "MAX" : nearby ? `✦ ${o.price} で${t.id === "carrier" || t.id === "waiter" ? "雇う" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
         })
         .join("");
       const atMarket =
@@ -175,7 +250,7 @@ export class GameUI {
         ) < 100;
       el("market-action").innerHTML =
         this.selectedInvestment === "market"
-          ? `<div class="market-card"><b>木5 → ✦ ${4 + economy.market}<span>販売済 ${economy.sold}個</span></b><p>${economy.waiter ? `預かり木 ${economy.stock} / 30 · 配達係が5個ずつお届け` : "建築に使うか、売って投資するか。木材の使い道は自由。"}</p><button id="market-supply" ${!atMarket || s.resources.wood < (economy.waiter ? 1 : 5) || (economy.waiter && economy.stock >= 30) ? "disabled" : ""}>${atMarket ? (economy.waiter ? "持っている木を預ける" : "木5を売る") : "市場タイルで木を売れます"}</button></div>`
+          ? `<div class="market-card"><b>木5 → ✦ ${4 + economy.market}<span>販売済 ${economy.sold}個</span></b><p>${economy.waiter ? `預かり木 ${economy.stock} / ${system.storageCapacity} · 配達係が5個ずつお届け` : economy.stock > 0 ? `預かり木 ${economy.stock} / ${system.storageCapacity} · 木5個ずつ手売りできます` : "建築に使うか、売って投資するか。木材の使い道は自由。"}</p><button id="market-supply" ${!atMarket || (economy.waiter ? s.resources.wood < 1 : s.resources.wood < 5 && economy.stock < 5) || (economy.waiter && economy.stock >= system.storageCapacity) ? "disabled" : ""}>${atMarket ? (economy.waiter ? "持っている木を預ける" : economy.stock >= 5 ? "預かり木5を売る" : "木5を売る") : "市場タイルで木を売れます"}</button></div>`
           : "";
     }
     const key = JSON.stringify(s.resources) + st.capacity;
@@ -230,6 +305,7 @@ export class GameUI {
       s.won,
       system.focus,
       economy.carriers,
+      economy.route,
       Math.round(this.model.player.x / 30),
       Math.round(this.model.player.y / 30),
     ]);
@@ -257,7 +333,7 @@ export class GameUI {
           ? "橋へ素材を届けよう"
           : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;
         el("goal").innerHTML =
-          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${economy.carriers > 0 ? ` · 運搬${economy.carriers}体` : " · 市場で木を売って投資もできる"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
+          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${economy.carriers > 0 ? ` · ${economy.route === "market" ? "市場" : "建築"}担当${economy.carriers}体` : " · 市場で木を売って投資もできる"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
       }
     }
     const ready =

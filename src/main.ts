@@ -67,6 +67,8 @@ function boot() {
     "invest-toggle",
     "invest-close",
     "invest-return",
+    "investment-filters",
+    "crew-routing",
     "tile-action",
     "investment-options",
     "market-action",

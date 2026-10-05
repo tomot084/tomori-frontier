@@ -71,3 +71,5 @@ and public-artifact allowlist remain unchanged.
 ### 投資拠点・市場の追加（2026-10-05）
 
 5種の地面タイルと費用表示（DynamicTexture）、道具台・かご・市場の小物、客用の板張りはプロジェクト内のコードで生成。配達係・客は既存のTomori独自精霊モデルを使用。追加の外部素材、参考画像由来の画像、外部音源は含まない。既存Kenney/QuaterniusのCC0出典は変更なし。
+
+The six additional investment props (sawmill, quarry, depot, cart, collection lantern, bounty board) added on 2026-10-06 are original code-generated geometry; no new third-party asset files or reference images are published.

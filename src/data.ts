@@ -68,7 +68,19 @@ export const buildingData: Building[] = [
     zone: 3,
   },
 ];
+export type Perk =
+  "sawmill" | "quarry" | "depot" | "cart" | "magnet" | "bounty";
+export const perkIds: Perk[] = [
+  "sawmill",
+  "quarry",
+  "depot",
+  "cart",
+  "magnet",
+  "bounty",
+];
 export interface Economy {
+  perks?: Partial<Record<Perk, number>>;
+  route?: "build" | "market";
   carriers: number;
   waiter: boolean;
   market: number;
@@ -190,6 +202,21 @@ export function load(raw: string | null): Save {
       ...v,
       economy: v.economy
         ? {
+            ...(v.economy.perks
+              ? {
+                  perks: Object.fromEntries(
+                    perkIds.map((id) => [
+                      id,
+                      Number.isInteger(v.economy.perks[id])
+                        ? Math.max(0, Math.min(3, v.economy.perks[id]))
+                        : 0,
+                    ]),
+                  ),
+                }
+              : {}),
+            ...(v.economy.route === "market" || v.economy.route === "build"
+              ? { route: v.economy.route }
+              : {}),
             carriers: Number.isInteger(v.economy.carriers)
               ? Math.max(0, Math.min(2, v.economy.carriers))
               : 0,
@@ -198,7 +225,17 @@ export function load(raw: string | null): Save {
               ? Math.max(0, Math.min(3, v.economy.market))
               : 0,
             stock: Number.isInteger(v.economy.stock)
-              ? Math.max(0, Math.min(30, v.economy.stock))
+              ? Math.max(
+                  0,
+                  Math.min(
+                    30 +
+                      20 *
+                        (Number.isInteger(v.economy.perks?.depot)
+                          ? Math.max(0, Math.min(3, v.economy.perks.depot))
+                          : 0),
+                    v.economy.stock,
+                  ),
+                )
               : 0,
             sold: Number.isInteger(v.economy.sold)
               ? Math.max(0, v.economy.sold)

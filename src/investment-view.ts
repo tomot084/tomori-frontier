@@ -101,6 +101,83 @@ export class InvestmentView {
               palette.cut,
             ),
           );
+      } else if (tile.id === "sawmill") {
+        parts.push(
+          art.box("saw-table", 0, 0.7, 0.6, 1.7, 0.24, 0.85, palette.wood),
+        );
+        for (const x of [-0.65, 0.65])
+          parts.push(
+            art.box("saw-leg", x, 0.4, 0.6, 0.15, 0.8, 0.7, palette.leather),
+          );
+        const saw = art.cylinder(
+          "saw-wheel",
+          0.1,
+          1,
+          0.6,
+          0.44,
+          0.44,
+          0.12,
+          palette.stoneLight,
+          12,
+        );
+        saw.rotation.x = Math.PI / 2;
+        parts.push(saw);
+        parts.push(
+          art.box("raw-timber", -0.4, 0.94, 0.15, 1.2, 0.17, 0.23, palette.cut),
+        );
+      } else if (tile.id === "quarry") {
+        for (let i = 0; i < 3; i++) {
+          const rock = art.rock("cut-stone", 0.62, palette.stoneLight, i);
+          rock.position.set((i - 1) * 0.46, 0.15, 0.6);
+          parts.push(rock);
+        }
+        parts.push(
+          art.box("stone-brace", 0, 0.6, 0.62, 1.5, 0.08, 0.16, palette.wood),
+        );
+      } else if (tile.id === "depot") {
+        for (let i = 0; i < 3; i++) {
+          const x = (i - 1) * 0.55,
+            y = i === 1 ? 0.95 : 0.4;
+          parts.push(
+            art.box("storage-crate", x, y, 0.65, 0.54, 0.65, 0.6, palette.wood),
+            art.box("crate-band", x, y, 0.33, 0.57, 0.09, 0.05, palette.cut),
+          );
+        }
+      } else if (tile.id === "cart") {
+        parts.push(
+          art.box("cart-bed", 0, 0.58, 0.65, 1.3, 0.18, 0.85, palette.wood),
+          art.box("cart-side", 0, 0.88, 1, 1.4, 0.5, 0.1, palette.cut),
+        );
+        for (const x of [-0.65, 0.65])
+          for (const z of [0.3, 1]) {
+            const wheel = art.cylinder(
+              "cart-wheel",
+              x,
+              0.35,
+              z,
+              0.28,
+              0.28,
+              0.12,
+              palette.ink,
+            );
+            wheel.rotation.z = Math.PI / 2;
+            parts.push(wheel);
+          }
+      } else if (tile.id === "bounty") {
+        parts.push(
+          art.box("notice-post", 0, 0.7, 0.7, 0.2, 1.3, 0.2, palette.wood),
+          art.box(
+            "notice-board",
+            0,
+            1.24,
+            0.65,
+            1.45,
+            0.85,
+            0.15,
+            palette.leather,
+          ),
+          art.box("wanted-poster", 0, 1.24, 0.55, 1, 0.62, 0.03, palette.cream),
+        );
       } else {
         parts.push(
           art.cylinder(
@@ -206,6 +283,7 @@ export class InvestmentView {
       this.game.investments.economy.carriers,
       this.game.investments.economy.waiter,
       this.game.investments.economy.market,
+      this.game.investments.economy.perks,
     ]);
     if (key !== this.paintKey) {
       this.paintKey = key;
@@ -233,6 +311,14 @@ export class InvestmentView {
         texture.update();
       }
     }
+    for (const base of this.bases) {
+      if (base.name === "investment-bounty")
+        base.setEnabled(this.game.s.zone > 0);
+    }
+    for (const { texture, tile } of this.paints) {
+      const plane = this.art.scene.getMeshByName(`tile-${tile.id}`);
+      plane?.setEnabled(tile.id !== "bounty" || this.game.s.zone > 0);
+    }
     const w = this.game.investments.waiter;
     this.waiter.root.setEnabled(w.active);
     this.waiter.root.position.copyFrom(
@@ -247,7 +333,9 @@ export class InvestmentView {
     this.waiter.stone.setEnabled(false);
     this.stock.setEnabled(this.game.investments.economy.stock > 0);
     this.stock.scaling.y =
-      0.4 + (0.6 * this.game.investments.economy.stock) / 30;
+      0.4 +
+      (0.6 * this.game.investments.economy.stock) /
+        this.game.investments.storageCapacity;
     const age = (this.game.time - this.game.investments.servedAt) / 1000;
     this.customers.forEach((c, i) => {
       c.root.position.y =

@@ -21,7 +21,13 @@ test("real gathered wood funds optional hiring, waiter delivery and a different 
   await page.goto("?e2e");
   await page.getByRole("button", { name: "島へ降りる" }).click();
   await page.getByRole("button", { name: "投資先を見る" }).click();
+  await expect(page.locator(".investment-card")).toHaveCount(11);
+  await page.locator('[data-filter="採集"]').click();
   await expect(page.locator(".investment-card")).toHaveCount(5);
+  await expect(page.locator('[data-investment="sawmill"]')).toBeVisible();
+  await page.locator('[data-filter="探索"]').click();
+  await expect(page.locator('[data-investment="bounty"]')).toBeDisabled();
+  await page.locator('[data-filter="すべて"]').click();
   await page.locator('[data-investment="market"]').click();
   await expect(page.locator("#goal b")).toContainText("灯材市場タイルへ行こう");
   await page.getByRole("button", { name: "投資先を見る" }).click();
@@ -138,6 +144,116 @@ test("real gathered wood funds optional hiring, waiter delivery and a different 
   expect(
     await page.evaluate(() => (window as any).__game.state().economy.sold),
   ).toBe(20);
+  await collect(10);
+  await market();
+  await page.getByRole("button", { name: "持っている木を預ける" }).click();
+  await page.getByRole("button", { name: "投資先を閉じる" }).click();
+  await expect
+    .poll(
+      () => page.evaluate(() => (window as any).__game.state().resources.coin),
+      { timeout: 20000 },
+    )
+    .toBe(13);
+  await page.evaluate(() => (window as any).__game.position(570, 240));
+  await page.locator("#tile-action").click();
+  await page.locator('[data-investment="carrier"]').click();
+  await page.locator('[data-route="market"]').click();
+  await expect(page.locator('[data-route="market"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await page.screenshot({ path: "screenshots/choices-tested-route-390.png" });
+  await page.getByRole("button", { name: "投資先を閉じる" }).click();
+  await expect
+    .poll(
+      () => page.evaluate(() => (window as any).__game.state().economy.sold),
+      { timeout: 35000 },
+    )
+    .toBeGreaterThanOrEqual(35);
+  expect(
+    await page.evaluate(() => (window as any).__game.state().resources.wood),
+  ).toBe(0);
+  expect(
+    await page.evaluate(() => (window as any).__game.state().progress[0].wood),
+  ).toBe(0);
+  await page.evaluate(() => (window as any).__game.save());
+  await page.reload();
+  await page.getByRole("button", { name: "島へ降りる" }).click();
+  expect(
+    await page.evaluate(() => (window as any).__game.state().economy.route),
+  ).toBe("market");
   expect(errors).toEqual([]);
   expect(external).toEqual([]);
+});
+
+test("a carrier's actual market deliveries can be sold by hand before hiring a waiter", async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => {
+    if (m.type() === "error") errors.push(m.text());
+  });
+  page.on("response", (r) => {
+    if (r.status() >= 400) errors.push(r.url());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Restore an owned carrier, then require actual harvesting/delivery for all stock and income.
+  await page.addInitScript(() => {
+    if (!localStorage.getItem("tomori-frontier-v1"))
+      localStorage.setItem(
+        "tomori-frontier-v1",
+        JSON.stringify({
+          version: 1,
+          zone: 0,
+          x: 450,
+          y: 290,
+          hp: 80,
+          time: 0,
+          kills: 0,
+          won: false,
+          resources: { wood: 0, stone: 0, food: 0, coin: 0 },
+          levels: { attack: 0, gather: 0, speed: 0, health: 0, capacity: 0 },
+          progress: [
+            { wood: 0, stone: 0, food: 0 },
+            { wood: 0, stone: 0, food: 0 },
+            { wood: 0, stone: 0, food: 0 },
+          ],
+          economy: {
+            carriers: 1,
+            waiter: false,
+            market: 0,
+            stock: 0,
+            sold: 0,
+            route: "market",
+          },
+        }),
+      );
+  });
+  await page.goto("?e2e");
+  await page.getByRole("button", { name: "島へ降りる" }).click();
+  await expect
+    .poll(
+      () => page.evaluate(() => (window as any).__game.state().economy.stock),
+      { timeout: 30000 },
+    )
+    .toBeGreaterThanOrEqual(5);
+  await page.evaluate(() => (window as any).__game.position(610, 500));
+  await page.locator("#tile-action").click();
+  await expect(
+    page.getByRole("button", { name: "預かり木5を売る", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByRole("button", { name: "預かり木5を売る", exact: true })
+    .click();
+  expect(
+    await page.evaluate(() => (window as any).__game.state().resources.coin),
+  ).toBe(4);
+  expect(
+    await page.evaluate(() => (window as any).__game.state().economy.waiter),
+  ).toBe(false);
+  expect(
+    await page.evaluate(() => (window as any).__game.state().resources.wood),
+  ).toBe(0);
+  expect(errors).toEqual([]);
 });
