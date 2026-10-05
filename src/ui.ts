@@ -116,6 +116,7 @@ export class GameUI {
       "暁の灯台に光をともそう",
     ];
     const goalKey = JSON.stringify([
+      this.model.guidance,
       s.zone,
       s.progress,
       s.resources,
@@ -131,26 +132,25 @@ export class GameUI {
       else {
         const b = buildingData[s.zone],
           p = s.progress[s.zone];
-        const needs = (["wood", "stone", "food"] as const).filter(
-          (r) => b.cost[r] > p[r],
-        );
-        const ready = needs.every((r) => s.resources[r] >= b.cost[r] - p[r]);
+        const guide = this.model.guidance;
         const total = Object.values(b.cost).reduce((a, n) => a + n, 0),
           done = Object.values(p).reduce((a, n) => a + n, 0);
-        const target = { x: 450, y: b.y };
-        const dx = target.x - this.model.player.x,
-          dy = target.y - this.model.player.y;
-        const sx = dx * 0.91 + dy * 0.414,
-          sy = -dx * 0.414 + dy * 0.91;
+        const dx = guide.target.x - this.model.player.x,
+          dy = guide.target.y - this.model.player.y;
+        const sx = dx * 0.91 - dy * 0.414,
+          sy = dx * 0.414 + dy * 0.91;
         const arrows = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
         const arrow =
           arrows[(Math.round(Math.atan2(sy, sx) / (Math.PI / 4)) + 8) % 8];
+        const building = guide.kind === "build";
+        const title = building
+          ? "橋へ素材を届けよう"
+          : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;
         el("goal").innerHTML =
-          `<b>${names[s.zone]} <em>${Math.round((done / total) * 100)}%</em></b><small>${ready ? "素材が揃った！ 建築地点へ" : needs.map((r) => `${resourceData[r].name} あと${Math.max(0, b.cost[r] - p[r] - s.resources[r])}`).join(" · ")} <span>${arrow} 建築へ</span></small>`;
+          `<b>${arrow} ${building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${building ? "光る輪の中で、自動投入" : "光る目印へ移動すると、自動で採集"} <em>${names[s.zone]} ${Math.min(100, Math.round((done / total) * 100))}%</em></small>`;
       }
     }
-    const show =
-      started && this.model.atCamp && (s.zone > 0 || s.resources.coin > 0);
+    const show = started && (s.zone > 0 || s.resources.coin > 0);
     el("shop-toggle").classList.toggle(
       "upgrade-ready",
       (Object.keys(upgradeData) as Upgrade[]).some(
@@ -165,15 +165,16 @@ export class GameUI {
       this.lastShop = sk;
       const symbols = {
         attack: "⚔",
-        gather: "⛏",
-        speed: "➜",
+        gather:
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 21 9-14M10 4l8 2 3 5-8-2Z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/></svg>',
+        speed: "→",
         health: "♡",
         capacity: "▤",
       };
       el("upgrades").innerHTML = (Object.keys(upgradeData) as Upgrade[])
         .map(
           (u) =>
-            `<button data-u="${u}" ${s.resources.coin < cost(s, u) || s.levels[u] >= 5 ? "disabled" : ""}><i>${symbols[u]}</i><span><b>${upgradeData[u].name}<em>Lv.${s.levels[u]}</em></b><small>${upgradeData[u].description}</small></span><strong>${s.levels[u] >= 5 ? "MAX" : `✦ ${cost(s, u)}`}</strong></button>`,
+            `<button class="${u === "gather" && s.levels.gather === 0 ? "recommended" : ""}" data-u="${u}" ${s.resources.coin < cost(s, u) || s.levels[u] >= 5 ? "disabled" : ""}><i>${symbols[u]}</i><span><b>${upgradeData[u].name}${u === "gather" && s.levels.gather === 0 ? " · おすすめ" : ""}<em>Lv.${s.levels[u]}</em></b><small>${upgradeData[u].description}</small></span><strong>${s.levels[u] >= 5 ? "MAX" : `✦ ${cost(s, u)}`}</strong></button>`,
         )
         .join("");
     }

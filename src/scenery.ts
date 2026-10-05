@@ -42,7 +42,7 @@ function island(art: Art, zone: number, start: number, end: number) {
     const co = color(hex);
     for (let i = 0; i < 3; i++) colors.push(co.r, co.g, co.b, 1);
   }
-  const grass = [0x93bd79, 0x82b894, 0x8aafa1][zone],
+  const grass = [0xabc980, 0x82b894, 0x8aafa1][zone],
     center = worldPoint(450, (start + end) / 2, 0.02);
   for (let i = 0; i < outline.length; i++) {
     const j = (i + 1) % outline.length;

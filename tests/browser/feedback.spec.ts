@@ -38,7 +38,7 @@ test("right-side touch works and real pickup updates the objective and HUD", asy
     )
     .toBe(5);
   await expect(page.locator('[data-resource="wood"] strong')).toHaveText("5");
-  await expect(page.locator("#goal small")).toContainText("木 あと15");
+  await expect(page.locator("#goal b")).toContainText("橋へ素材を届けよう");
   await expect(page.locator('[data-resource="wood"]')).toHaveClass(/collected/);
   await page.screenshot({ path: "screenshots/polish-feedback-390.png" });
   await context.close();

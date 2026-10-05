@@ -127,6 +127,7 @@ function boot() {
         debugInput = { x, y };
       },
       inspect: () => ({
+        guidance: model.guidance,
         effects: view.particles.length,
         stick: movement.stick,
         shop: ui.shopShown,
@@ -140,7 +141,10 @@ function boot() {
       delta = Math.min(240, now - last);
     last = now;
     const paused =
-      !started || (el("config") as HTMLDialogElement).open || document.hidden;
+      !started ||
+      ui.shopOpen ||
+      (el("config") as HTMLDialogElement).open ||
+      document.hidden;
     movement.enabled = !paused && !ui.shopOpen;
     if (!paused) {
       const dir = ui.shopOpen

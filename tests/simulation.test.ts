@@ -107,3 +107,31 @@ it("emits pickup rewards only when a real drop fits the inventory", () => {
   expect(m.events.some((e) => e.type === "pickup")).toBe(false);
   expect(m.drops).toHaveLength(1);
 });
+
+it("guides the first handful to construction, then funds a visibly stronger tool", () => {
+  const m = new GameModel(fresh());
+  expect(m.guidance.kind).toBe("wood");
+  expect(m.guidance.remaining).toBe(5);
+  m.player = { ...m.guidance.target };
+  for (let t = 0; t < 3000 && m.s.resources.wood < 5; t += 20) run(m, 20);
+  expect(m.s.resources.wood).toBeGreaterThanOrEqual(5);
+  expect(m.guidance.kind).toBe("build");
+  m.player = { x: 450, y: 682 };
+  run(m, 900);
+  expect(m.s.progress[0].wood).toBe(5);
+  expect(m.s.resources.coin).toBe(4);
+  expect(m.guidance.kind).toBe("wood");
+  m.player = { ...m.guidance.target };
+  for (let t = 0; t < 3000 && m.s.resources.wood < 5; t += 20) run(m, 20);
+  m.player = { x: 450, y: 682 };
+  run(m, 900);
+  expect(m.s.progress[0].wood).toBe(10);
+  expect(m.s.resources.coin).toBe(8);
+  expect(m.purchase("gather")).toBe(true);
+  const target = m.nodes.find((n) => !n.dead && n.kind === "wood")!;
+  m.player = { x: target.x, y: target.y };
+  run(m, 550);
+  expect(target.dead).toBeGreaterThan(0);
+  const old = JSON.stringify(m.snapshot());
+  expect(load(old)).toEqual(m.snapshot());
+});

@@ -82,6 +82,8 @@ export class WorldView {
   cargoBounceAt = -100;
   depositAt = [-100, -100, -100];
   playerRing!: Mesh;
+  guideRing!: Mesh;
+  guideLabel!: HTMLElement;
   constructor(
     public canvas: HTMLCanvasElement,
     public model: GameModel,
@@ -137,6 +139,20 @@ export class WorldView {
     this.shadows.normalBias = 0.025;
     this.shadows.setDarkness(0.24);
     this.art = new Art(this.scene);
+    this.guideRing = MeshBuilder.CreateTorus(
+      "next-action",
+      { diameter: 2.1, thickness: 0.075, tessellation: 32 },
+      this.scene,
+    );
+    const guidePaint = new StandardMaterial("guide-gold", this.scene);
+    guidePaint.diffuseColor = color(0xffe19b);
+    guidePaint.emissiveColor = color(0xbfa968);
+    guidePaint.disableLighting = true;
+    this.guideRing.material = guidePaint;
+    this.guideRing.isPickable = false;
+    this.guideLabel = document.createElement("div");
+    this.guideLabel.className = "guide-label";
+    overlay.append(this.guideLabel);
     this.shadowMaterial = this.makeShadowMaterial();
     this.scenery = makeScenery(this.art);
     this.rig = this.art.player();
@@ -309,7 +325,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 9 : 8;
+    const halfHeight = ratio < 0.8 ? 7.8 : 8;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -551,8 +567,8 @@ export class WorldView {
       key = `${s.resources.wood},${s.resources.stone},${s.resources.food}`;
     if (key === this.lastInventory) return;
     this.lastInventory = key;
-    const wood = Math.min(8, Math.ceil(s.resources.wood / 3)),
-      stone = Math.min(4, Math.ceil(s.resources.stone / 7));
+    const wood = Math.min(8, s.resources.wood),
+      stone = Math.min(4, Math.ceil(s.resources.stone / 2));
     this.rig.wood.forEach((m, i) => m.setEnabled(i < wood));
     this.rig.stone.forEach((m, i) => {
       m.setEnabled(i < stone);
@@ -597,7 +613,23 @@ export class WorldView {
         });
         this.pickupBatches.delete(kind);
       }
-    const desired = worldPoint(m.player.x, m.player.y + 85);
+    const desired = worldPoint(
+      m.player.x,
+      m.player.y - (this.width < this.height ? 45 : 10),
+    );
+    const guide = m.guidance;
+    this.guideRing.setEnabled(guide.kind !== "done");
+    this.guideRing.position.copyFrom(
+      worldPoint(guide.target.x, guide.target.y, 0.075),
+    );
+    this.guideRing.scaling.setAll(1 + Math.sin(this.time * 4) * 0.055);
+    this.guideLabel.textContent =
+      guide.kind === "build"
+        ? "ここへ届ける"
+        : guide.kind === "done"
+          ? ""
+          : `${resourceData[guide.kind].name}を集める`;
+
     Vector3.LerpToRef(
       this.target,
       desired,
@@ -878,6 +910,15 @@ export class WorldView {
         worldPoint(campPts[i][0], campPts[i][1] - 10, 1.9),
         i <= m.s.zone,
       ),
+    );
+    this.place(
+      this.guideLabel,
+      worldPoint(
+        guide.target.x,
+        guide.target.y,
+        guide.kind === "wood" ? 3.6 : 1.25,
+      ),
+      guide.kind !== "done",
     );
     this.scene.render();
   }

@@ -923,3 +923,78 @@ dialog #close {
     content: "WASD / 矢印で移動";
   }
 }
+/* Local gameplay rethink: the next action and the playfield take precedence. */
+#hud {
+  max-width: 430px;
+}
+#resources {
+  gap: 5px;
+}
+.resource-chip {
+  border-radius: 12px;
+  padding: 5px 5px 4px;
+  grid-template-columns: 23px 1fr;
+  box-shadow: 0 2px 0 #244e4920;
+}
+.resource-chip svg {
+  width: 23px;
+  height: 23px;
+}
+.resource-chip strong {
+  font-size: 20px;
+}
+.resource-chip small {
+  font-size: 9px;
+  margin: 0;
+}
+.vitals {
+  height: 20px;
+}
+.objective {
+  max-width: 100%;
+  border-radius: 13px;
+  padding: 7px 10px;
+  gap: 6px;
+}
+.objective-icon {
+  display: none;
+}
+#goal b {
+  font-size: 15px;
+  line-height: 1.4;
+}
+#goal small {
+  font-size: 11px;
+  line-height: 1.5;
+}
+#goal em {
+  font-size: 10px;
+  opacity: 0.7;
+  font-style: normal;
+  margin-left: 4px;
+}
+.guide-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: #fff3ca;
+  color: #65502c;
+  padding: 6px 10px;
+  border: 2px solid #ffe4a0;
+  border-radius: 16px;
+  box-shadow: 0 3px 0 #4c593b30;
+  white-space: nowrap;
+  font-size: 13px;
+}
+#save-status {
+  display: none;
+}
+
+#upgrades i svg {
+  width: 26px;
+  height: 26px;
+}
+#upgrades button.recommended:not(:disabled) {
+  border-color: #b99643;
+  background: #fff0bf;
+}

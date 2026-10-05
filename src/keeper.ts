@@ -1,3 +1,4 @@
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { LoadAssetContainerAsync } from "@babylonjs/core/Loading/sceneLoader";
 import "@babylonjs/loaders/glTF/2.0/glTFLoader";
 import "@babylonjs/loaders/glTF/glTFFileLoader";
@@ -47,6 +48,13 @@ export class Keeper {
       source.unlit = true;
       source.backFaceCulling = false;
       source.emissiveColor = Color3.Black();
+      if (mesh.name === "Cloak") {
+        const cloth = new StandardMaterial("tomori-hood", art.scene);
+        cloth.diffuseColor = new Color3(0.23, 0.66, 0.68);
+        cloth.specularColor = Color3.Black();
+        cloth.backFaceCulling = false;
+        mesh.material = cloth;
+      }
       if (!this.body || mesh.getTotalVertices() > this.body.getTotalVertices())
         this.body = mesh;
     }

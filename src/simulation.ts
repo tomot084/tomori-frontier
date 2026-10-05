@@ -148,6 +148,50 @@ export class GameModel {
         Math.hypot(c.x - this.player.x, c.y - this.player.y) < 85,
     );
   }
+  get guidance(): {
+    kind: "wood" | "stone" | "food" | "build" | "done";
+    target: Point;
+    remaining: number;
+  } {
+    if (this.s.won || this.s.zone >= 3)
+      return { kind: "done", target: this.player, remaining: 0 };
+    const i = this.s.zone,
+      b = buildingData[i],
+      progress = this.s.progress[i],
+      st = stats(this.s);
+    const build = {
+      kind: "build" as const,
+      target: { x: 450, y: b.y },
+      remaining: 0,
+    };
+    // Deliver the first handful: show tangible construction before a long shopping list.
+    if (i === 0 && progress.wood < b.cost.wood && this.s.resources.wood >= 5)
+      return build;
+    for (const kind of ["wood", "stone", "food"] as const) {
+      const cap = kind === "food" ? Math.floor(st.capacity / 2) : st.capacity;
+      if (this.s.resources[kind] >= cap && progress[kind] < b.cost[kind])
+        return build;
+    }
+    for (const kind of ["wood", "stone", "food"] as const) {
+      let remaining = Math.max(
+        0,
+        b.cost[kind] - progress[kind] - this.s.resources[kind],
+      );
+      if (i === 0 && kind === "wood" && progress.wood < b.cost.wood)
+        remaining = Math.min(remaining, Math.max(0, 5 - this.s.resources.wood));
+      if (!remaining) continue;
+      const candidates = this.nodes.filter(
+        (n) => n.kind === kind && !n.dead && n.zone <= i && n.y < b.y,
+      );
+      candidates.sort(
+        (a, b) =>
+          Math.hypot(a.x - this.player.x, a.y - this.player.y) -
+          Math.hypot(b.x - this.player.x, b.y - this.player.y),
+      );
+      if (candidates.length) return { kind, target: candidates[0], remaining };
+    }
+    return build;
+  }
   purchase(u: Upgrade) {
     if (!upgrade(this.s, u)) return false;
     this.event("upgrade", this.player, { kind: u });
@@ -212,9 +256,10 @@ export class GameModel {
       if (n) {
         this.gatherAt = time + st.gather;
         this.event("swing", n, { kind: n.kind });
-        n.hp -= 3;
+        const power = 3 * (1 + this.s.levels.gather);
+        n.hp -= power;
         this.event("hit", n, { id: n.id, kind: n.kind });
-        this.pop(n, "−3");
+        this.pop(n, `−${power}`);
         this.burst(n, resourceData[n.kind].color, 6);
         if (n.hp <= 0) {
           n.dead = time + gatherableData[n.kind].respawn * 1000;
@@ -329,8 +374,24 @@ export class GameModel {
         );
         if (r) {
           this.event("deposit", p, { kind: r, index: i });
+          const delivered = Object.values(this.s.progress[i]).reduce(
+            (sum, count) => sum + count,
+            0,
+          );
+          if (i === 0 && (delivered === 5 || delivered === 10)) {
+            this.s.resources.coin += 4;
+            this.pop({ x: 450, y: b.y }, "橋板完成！ +4 灯貨");
+            this.burst({ x: 450, y: b.y }, 0xffdc88, 10);
+            this.toast(
+              delivered === 5
+                ? "橋板ができた！ もう一束届けると道具を強化できる"
+                : "道具を強化しよう。木を一撃で切れる！",
+            );
+            this.event("save", p);
+          }
           if (complete(this.s, i)) {
             this.s.zone++;
+            this.s.resources.coin += [8, 12, 20][i];
             this.event("complete", { x: 450, y: b.y }, { index: i });
             this.burst({ x: 450, y: b.y }, 0xffdc88, 20);
             this.toast(

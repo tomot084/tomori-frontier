@@ -48,7 +48,7 @@ export const upgradeData: Record<
   { name: string; base: number; description: string }
 > = {
   attack: { name: "灯刃", base: 8, description: "攻撃 +2" },
-  gather: { name: "道具", base: 7, description: "採集速度 +25%" },
+  gather: { name: "道具", base: 7, description: "木を一撃で採集 · 速度 +25%" },
   speed: { name: "旅靴", base: 6, description: "移動 +12%" },
   health: { name: "灯衣", base: 6, description: "最大HP +20" },
   capacity: { name: "背かご", base: 5, description: "容量 +10" },
