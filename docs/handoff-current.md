@@ -31,7 +31,9 @@
 
 最終production撮影 `choices-final-*` は390×844・412×915・1280×720・844×390で実施し、console/page error 0、asset 404 0、外部通信0、横はみ出しなし。採集・運営・探索の各一覧も保存してスマホとPCの実画像を確認。実採集した木20個を販売→配達係雇用→残り10個の自動配達と売上まで撮影した。`choices-tested-route-390.png` で市場担当の選択を確認。改善前の公開版は `choices-before-{390,1280}.png` に保存。全撮影と参考資料はローカル限定。
 
-公開確認は以下へ追記する。
+公開コードcommit `174b2848c02f670b955a2c44b2ff613e59592e32` をmainへpush。[Actions 37333137965](https://github.com/tomot084/tomori-frontier/actions/runs/37333137965) は単体28件・ブラウザ12件・build・dist監査が成功し、Pages deployも成功（build 6m56s / deploy 9s）。公開JS `assets/index-CfWMDLOn.js` のSHA-256は `cac7b7990732f4c96716b6862aa3cd27460296a5c7542e94139bd0d6e5053102` でローカルdistとバイト一致。
+
+公開URLを実ブラウザで再確認し、`choices-published-*` に390×844・412×915・1280×720・844×390と各分類一覧を保存。実採集→販売→雇用→自動配達まで成功。全4サイズconsole/page error 0、404 0、外部通信0、横はみ出しなし。公開スマホ一覧・配達中・PCの実画像を確認した。参考画像・撮影・作業ファイルがgit追跡されていないことも確認。
 
 
 ## 投資タイルと木材市場：強化する順番を選ぶ（2026-10-05）
