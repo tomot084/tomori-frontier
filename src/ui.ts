@@ -29,6 +29,7 @@ export class GameUI {
   shopShown = false;
   shopOpen = false;
   toastTimer = 0;
+  unlockTimer = 0;
   lastShop = "";
   lastResources = "";
   lastGoal = "";
@@ -61,6 +62,18 @@ export class GameUI {
       () => el("toast").classList.remove("show"),
       3000,
     );
+  }
+  celebrate(index: number) {
+    const rewards = [
+      "灯りの精霊が採集・運搬をお手伝い",
+      "精霊が2体に！ 採集で得られる素材も増加",
+      "三つの島を復旧。暁の灯りが戻った！",
+    ];
+    const card = el("unlock");
+    card.innerHTML = `<i>✦</i><div><small>開拓が進んだ！</small><b>${buildingData[index].name} 完成</b><span>${rewards[index]}</span></div>`;
+    card.hidden = false;
+    clearTimeout(this.unlockTimer);
+    this.unlockTimer = window.setTimeout(() => (card.hidden = true), 4500);
   }
   toggleShop(open = !this.shopOpen) {
     this.shopOpen = open;
@@ -147,9 +160,14 @@ export class GameUI {
           ? "橋へ素材を届けよう"
           : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;
         el("goal").innerHTML =
-          `<b>${arrow} ${building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${building ? "光る輪の中で、自動投入" : "光る目印へ移動すると、自動で採集"} <em>${names[s.zone]} ${Math.min(100, Math.round((done / total) * 100))}%</em></small>`;
+          `<b>${arrow} ${building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${s.zone > 0 ? ` · 精霊${Math.min(2, s.zone)}体がお手伝い` : " · 光る目印へ"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
       }
     }
+    const ready =
+      s.levels.gather === 0 && s.resources.coin >= cost(s, "gather");
+    el("shop-toggle").querySelector("small")!.textContent = ready
+      ? "木を一撃で切れる！"
+      : "灯貨で装備を強化";
     const show = started && (s.zone > 0 || s.resources.coin > 0);
     el("shop-toggle").classList.toggle(
       "upgrade-ready",

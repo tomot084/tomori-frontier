@@ -192,7 +192,7 @@ export class Art {
     core.rotation.z = Math.PI / 2;
     return this.merge(name, [body, ...ends, ring, core]);
   }
-  tree(seed: number) {
+  tree(seed: number, zone = 0) {
     const names = [
       "tree_oak",
       "tree_pineRoundD",
@@ -205,7 +205,17 @@ export class Art {
     data.positions = source.positions;
     data.normals = source.normals;
     data.uvs = new Array((source.positions.length / 3) * 2).fill(0);
-    data.colors = source.colors;
+    data.colors = source.colors.map((v, i) => {
+      const base = i - (i % 4);
+      const foliage = source.colors[base + 1] > source.colors[base] * 1.1;
+      if (!foliage || i % 4 === 3) return v;
+      const tint = [
+        [1.06, 1.02, 1.05],
+        [0.88, 1.02, 1.2],
+        [1.17, 1.03, 0.98],
+      ][zone];
+      return Math.min(1, v * tint[i % 4]);
+    });
     data.indices = source.indices;
     data.applyToMesh(mesh);
     mesh.material = this.material;
@@ -369,6 +379,75 @@ export class Art {
     );
     return this.merge("meadow-flower", p);
   }
+  helper(id: number) {
+    const root = new TransformNode("lantern-helper-" + id, this.scene);
+    const parts = [
+      this.sphere(
+        "sprite-hood",
+        0,
+        0.78,
+        0,
+        0.76,
+        0.83,
+        0.67,
+        id ? 0x78b5c2 : 0x5ab7a7,
+        true,
+      ),
+      this.sphere("sprite-face", 0, 0.76, 0.29, 0.53, 0.38, 0.13, 0xffefb8),
+      this.cylinder(
+        "sprite-lantern",
+        0,
+        0.32,
+        0,
+        0.21,
+        0.29,
+        0.38,
+        0xf7cb6e,
+        8,
+      ),
+      this.cylinder("sprite-cap", 0, 1.18, 0, 0, 0.17, 0.29, 0xffd579, 6),
+    ];
+    for (const side of [-1, 1]) {
+      parts.push(
+        this.sphere(
+          "sprite-eye",
+          side * 0.1,
+          0.79,
+          0.37,
+          0.065,
+          0.08,
+          0.035,
+          palette.ink,
+        ),
+      );
+      parts.push(
+        this.sphere(
+          "sprite-hand",
+          side * 0.38,
+          0.51,
+          0.06,
+          0.21,
+          0.22,
+          0.23,
+          0xffefb8,
+        ),
+      );
+    }
+    const body = this.merge("lantern-sprite", parts);
+    body.parent = root;
+    const logs = [0, 1, 2].map((i) => {
+      const m = this.log("helper-log");
+      m.position.set(0, 0.64 + i * 0.26, -0.46);
+      return m;
+    });
+    const wood = this.merge("helper-bundle", logs);
+    wood.parent = root;
+    const stone = this.rock("helper-stone", 0.68, palette.stoneLight, id);
+    stone.position.set(0, 0.57, -0.42);
+    stone.parent = root;
+    root.setEnabled(false);
+    return { root, body, wood, stone };
+  }
   camp() {
     const p: Mesh[] = [];
     p.push(this.box("floor", 0, 0.045, 0, 2.3, 0.09, 1.9, 0xb18d61));
@@ -518,20 +597,34 @@ export class Art {
       }
       p.push(this.cylinder("crest", 0, 0.91, 0, 0, 0.1, 0.3, 0xeec598, 4));
     }
-    for (const x of [-0.12, 0.12]) {
+    for (const side of [-1, 1]) {
+      const x = side * (type === 1 ? 0.2 : 0.14),
+        z = type === 1 ? 0.45 : type === 2 ? 0.22 : 0.34;
       p.push(
-        this.sphere("enemy-eye", x, 0.59, 0.34, 0.1, 0.14, 0.035, 0x293e4c),
+        this.sphere("enemy-eye-rim", x, 0.59, z, 0.2, 0.23, 0.06, 0xffe9b6),
+      );
+      p.push(
+        this.sphere(
+          "enemy-eye",
+          x,
+          0.59,
+          z + 0.045,
+          0.085,
+          0.14,
+          0.035,
+          0x293e4c,
+        ),
       );
       p.push(
         this.sphere(
           "eye-shine",
-          x - 0.012,
+          x - 0.015,
           0.625,
-          0.36,
-          0.029,
+          z + 0.064,
+          0.027,
           0.034,
-          0.01,
-          0xfff3d1,
+          0.014,
+          0xfff9e4,
         ),
       );
     }

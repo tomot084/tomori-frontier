@@ -4,6 +4,7 @@ import { GameModel, type Point } from "./simulation";
 import { WorldView } from "./view3d";
 import { MovementInput } from "./input";
 import { GameUI, el } from "./ui";
+import { GameFeedback } from "./feedback";
 import { Engine } from "@babylonjs/core/Engines/engine";
 let saved: string | null = null;
 try {
@@ -39,6 +40,7 @@ function boot() {
     debugInput: Point = { x: 0, y: 0 },
     last = performance.now(),
     uiAt = 0;
+  const feedback = new GameFeedback();
   const movement = new MovementInput(canvas, el("stick"));
   const ui = new GameUI(model, (u: Upgrade) => {
     if (model.purchase(u)) {
@@ -64,6 +66,7 @@ function boot() {
   el("shop-toggle").addEventListener("click", release);
   el("shop-close").addEventListener("click", release);
   el("start").onclick = () => {
+    feedback.activate();
     el("intro").remove();
     started = true;
     movement.enabled = true;
@@ -80,6 +83,15 @@ function boot() {
       localStorage.removeItem(KEY);
       location.reload();
     }
+  };
+  const paintFeedback = () => {
+    el("feedback").textContent =
+      `音・完成時の振動：${feedback.enabled ? "ON" : "OFF"}`;
+  };
+  paintFeedback();
+  el("feedback").onclick = () => {
+    feedback.toggle();
+    paintFeedback();
   };
   el("quality").onclick = () => {
     const low = view.quality !== "low";
@@ -128,6 +140,7 @@ function boot() {
       },
       inspect: () => ({
         guidance: model.guidance,
+        feedback: feedback.metrics(),
         effects: view.particles.length,
         stick: movement.stick,
         shop: ui.shopShown,
@@ -167,6 +180,8 @@ function boot() {
           ui.pulse(event.kind!);
         }
         view.effects(event);
+        feedback.play(event);
+        if (event.type === "complete") ui.celebrate(event.index!);
         if (event.type === "deposit" || event.type === "complete")
           view.syncSites();
       }

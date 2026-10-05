@@ -53,3 +53,17 @@ Original Ranger GLTF SHA-256:
 Source downloads stay in ignored local storage; the source packs are not part of
 the repository or distribution. The tree JSON contains only derived geometry
 for the three selected trees; it is compiled into the application bundle.
+
+## Living-island pass (2026-10-05)
+
+The approved GLB and Kenney geometry are unchanged. Runtime adaptations now use
+scene lighting on the Ranger, adjusted proportions, a slightly larger head,
+and brighter hood cloth. Per-island leaf colours are applied to copied vertex
+colours. Fourteen additional background trees fill the opening forest.
+
+Lantern helpers are original code-built meshes (hood, lantern body, face, hands,
+and cargo), not an imported character or a reference-image derivative. Short
+feedback cues are generated with Web Audio oscillators after a user gesture;
+there are no audio assets or runtime requests to another origin. These meshes
+and cues ship inside the built JavaScript. The existing third-party licences
+and public-artifact allowlist remain unchanged.

@@ -55,6 +55,7 @@ export class WorldView {
   scenery: ReturnType<typeof makeScenery>;
   actors = new Map<string, Actor>();
   dropMeshes = new Map<string, Mesh>();
+  crewRigs: (ReturnType<Art["helper"]> & { shadow: Mesh })[] = [];
   enemyBars = new Map<string, HTMLElement>();
   dangerRings = new Map<string, Mesh>();
   siteLabels: HTMLElement[] = [];
@@ -66,7 +67,7 @@ export class WorldView {
   width = 390;
   height = 844;
   target = Vector3.Zero();
-  cameraOffset = new Vector3(10, 19, -22);
+  cameraOffset = new Vector3(10, 23, -22);
   shakeUntil = 0;
   swing = { at: -100, kind: "wood", yaw: Math.PI };
   trail: Mesh;
@@ -115,16 +116,16 @@ export class WorldView {
       new Vector3(-0.2, 1, 0.1),
       this.scene,
     );
-    sky.intensity = 0.68;
+    sky.intensity = 0.9;
     sky.diffuse = new Color3(0.94, 1, 0.96);
-    sky.groundColor = new Color3(0.38, 0.52, 0.5);
+    sky.groundColor = new Color3(0.62, 0.72, 0.64);
     sky.specular = Color3.Black();
     this.sun = new DirectionalLight(
       "afternoon-sun",
       new Vector3(0.35, -1, 0.4),
       this.scene,
     );
-    this.sun.intensity = 0.85;
+    this.sun.intensity = 0.68;
     this.sun.diffuse = new Color3(1, 0.94, 0.79);
     this.sun.specular = Color3.Black();
     this.sun.shadowMinZ = 1;
@@ -137,7 +138,7 @@ export class WorldView {
     this.shadows.depthScale = 20;
     this.shadows.bias = 0.001;
     this.shadows.normalBias = 0.025;
-    this.shadows.setDarkness(0.24);
+    this.shadows.setDarkness(0.18);
     this.art = new Art(this.scene);
     this.guideRing = MeshBuilder.CreateTorus(
       "next-action",
@@ -170,7 +171,7 @@ export class WorldView {
       root.position.copyFrom(worldPoint(n.x, n.y));
       const mesh =
         n.kind === "wood"
-          ? this.art.tree(n.x + n.y)
+          ? this.art.tree(n.x + n.y, n.zone)
           : n.kind === "stone"
             ? this.art.boulder(n.x)
             : this.art.berry();
@@ -232,6 +233,10 @@ export class WorldView {
       overlay.append(bar);
       this.enemyBars.set(e.id, bar);
     }
+    this.crewRigs = model.crew.workers.map((w) => ({
+      ...this.art.helper(w.id),
+      shadow: this.shadow(0.8),
+    }));
     const playerShadow = this.shadow(0.95);
     this.actors.set("player", {
       root: this.rig.root,
@@ -365,13 +370,37 @@ export class WorldView {
       v.z < 1 &&
       v.x > -100 &&
       v.x < this.width + 100 &&
-      v.y > 120 &&
+      v.y > (this.width < this.height ? 200 : 120) &&
       v.y < this.height - 50;
     element.hidden = !inside;
     if (inside) {
-      if (element.classList.contains("site-label")) {
+      if (
+        element.classList.contains("site-label") ||
+        element.classList.contains("guide-label")
+      ) {
         const half = element.offsetWidth / 2;
         v.x = Math.max(half + 10, Math.min(this.width - half - 10, v.x));
+      }
+      if (element.classList.contains("site-label")) {
+        const half = element.offsetWidth / 2,
+          height = element.offsetHeight;
+        const faces = [
+          worldPoint(this.model.player.x, this.model.player.y, 1.7),
+          ...this.model.crew.workers
+            .filter((w) => w.active)
+            .map((w) => worldPoint(w.x, w.y, 1.05)),
+        ];
+        for (const face of faces) {
+          const actor = this.project(face);
+          if (
+            Math.abs(actor.x - v.x) < half + 20 &&
+            actor.y > v.y - height - 15 &&
+            actor.y < v.y + 40
+          )
+            v.y = Math.min(v.y, actor.y - 18);
+        }
+        if (v.y - height < (this.width < this.height ? 188 : 75))
+          element.hidden = true;
       }
       element.style.transform = `translate(${v.x}px,${v.y}px) translate(-50%,-100%)`;
     }
@@ -585,15 +614,19 @@ export class WorldView {
         built = this.model.s.zone > i,
         progress = built ? 1 : done / total;
       site.root.setEnabled(i <= this.model.s.zone);
-      site.pieces.forEach((m, j) =>
-        m.setEnabled(built || progress > (j + 0.5) / site.pieces.length),
-      );
+      site.pieces.forEach((m, j) => {
+        const visible = built || progress > (j + 0.5) / site.pieces.length;
+        if (visible && !m.isEnabled()) {
+          m.metadata = { raisedAt: this.time, baseY: m.position.y };
+        }
+        m.setEnabled(visible);
+      });
       site.marker.setEnabled(!built);
       this.siteLabels[i].innerHTML = built
         ? i === 2
           ? "<b>暁の灯台</b><span>復旧完了</span>"
           : ""
-        : `<b>${i === 0 ? "芽渡り橋" : b.name}</b><span>木 ${p.wood}/${b.cost.wood} · 石 ${p.stone}/${b.cost.stone}${b.cost.food ? ` · 実 ${p.food}/${b.cost.food}` : ""}</span><i style="--progress:${progress * 100}%"></i>`;
+        : `<b>${i === 0 ? "芽渡り橋" : b.name}</b><span>木 ${Math.max(0, b.cost.wood - p.wood)} · 石 ${Math.max(0, b.cost.stone - p.stone)}${b.cost.food ? ` · 実 ${Math.max(0, b.cost.food - p.food)}` : ""}</span><i style="--progress:${progress * 100}%"></i>`;
       site.progress = progress;
     });
   }
@@ -700,6 +733,27 @@ export class WorldView {
         .filter((mesh) => mesh.isEnabled()) as Mesh[],
       radius = Math.max(17, (this.camera.orthoRight || 5) + 8);
     this.visibleActors = 0;
+    for (const w of m.crew.workers) {
+      const rig = this.crewRigs[w.id];
+      rig.root.setEnabled(w.active);
+      rig.shadow.setEnabled(w.active);
+      if (!w.active) continue;
+      rig.root.position.copyFrom(
+        worldPoint(w.x, w.y, 0.07 + Math.sin(this.time * 6 + w.id) * 0.07),
+      );
+      rig.root.rotation.y = w.heading;
+      rig.body.rotation.z =
+        w.phase === "harvest"
+          ? Math.sin(this.time * 14) * 0.16
+          : Math.sin(this.time * 7) * 0.035;
+      rig.wood.setEnabled(w.cargo > 0 && w.kind === "wood");
+      rig.stone.setEnabled(w.cargo > 0 && w.kind === "stone");
+      rig.shadow.position.copyFrom(worldPoint(w.x, w.y, 0.036));
+      casters.push(
+        rig.body,
+        ...(w.cargo ? [w.kind === "wood" ? rig.wood : rig.stone] : []),
+      );
+    }
     for (const n of m.nodes) {
       const a = this.actors.get(n.id)!,
         age = this.time - a.dieAt,
@@ -724,13 +778,18 @@ export class WorldView {
       a.root.scaling.setAll(dying ? Math.max(0.01, 1 - (age - 0.1) * 3) : 1);
       a.shadow.visibility = dying ? Math.max(0, 1 - age / 0.36) : 1;
       const toPlayer = a.root.position.subtract(p.root.position);
+      const hidesHelper = m.crew.workers.some(
+        (w) => w.active && Math.hypot(w.x - n.x, w.y - n.y) < 42,
+      );
       a.mesh.visibility =
-        n.kind === "wood" &&
-        toPlayer.length() < 2.2 &&
-        (Vector3.Dot(toPlayer, new Vector3(9, 0, -20)) > 0 ||
-          toPlayer.length() < 1.1)
-          ? 0.18
-          : 1;
+        hidesHelper && n.kind === "wood"
+          ? 0.3
+          : n.kind === "wood" &&
+              toPlayer.length() < 2.2 &&
+              (Vector3.Dot(toPlayer, new Vector3(9, 0, -20)) > 0 ||
+                toPlayer.length() < 1.1)
+            ? 0.18
+            : 1;
       if (a.mesh.visibility > 0.9) casters.push(a.mesh);
     }
     for (const e of m.enemies) {
@@ -781,6 +840,18 @@ export class WorldView {
           bar,
           a.root.position.add(new Vector3(0, e.type === 1 ? 1.25 : 1.4, 0)),
         );
+        bar.classList.toggle(
+          "engaged",
+          Math.hypot(e.x - m.player.x, e.y - m.player.y) < 100 &&
+            !m.enemies.some(
+              (other) =>
+                !other.dead &&
+                other.zone <= m.s.zone &&
+                other !== e &&
+                Math.hypot(other.x - m.player.x, other.y - m.player.y) <
+                  Math.hypot(e.x - m.player.x, e.y - m.player.y),
+            ),
+        );
         (bar.firstElementChild as HTMLElement).style.width =
           `${(e.hp / enemyData[e.type].hp) * 100}%`;
       } else bar.hidden = true;
@@ -799,7 +870,11 @@ export class WorldView {
       }
     });
     casters.push(
-      ...this.scenery.shadowCasters.filter((mesh) => mesh.visibility > 0.9),
+      ...this.scenery.shadowCasters.filter(
+        (mesh) =>
+          mesh.visibility > 0.9 &&
+          Vector3.DistanceSquared(mesh.position, this.target) < radius * radius,
+      ),
     );
     for (const site of this.scenery.sites)
       if (
@@ -883,6 +958,13 @@ export class WorldView {
       );
     }
     this.scenery.sites.forEach((site, i) => {
+      for (const piece of site.pieces) {
+        if (!piece.isEnabled() || !piece.metadata) continue;
+        const age = this.time - piece.metadata.raisedAt;
+        const t = Math.min(1, Math.max(0, age / 0.38));
+        piece.position.y = piece.metadata.baseY + Math.sin(t * Math.PI) * 0.15;
+        piece.scaling.setAll(0.84 + 0.16 * t);
+      }
       const label = this.siteLabels[i];
       const age = this.time - this.depositAt[i];
       site.marker.scaling.setAll(
@@ -893,7 +975,7 @@ export class WorldView {
       );
       this.place(
         label,
-        worldPoint(450, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1),
+        worldPoint(590, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1.4),
         i <= m.s.zone &&
           (m.s.zone <= i || i === 2) &&
           Math.abs(m.player.y - buildingData[i].y) < 340,
@@ -918,7 +1000,7 @@ export class WorldView {
         guide.target.y,
         guide.kind === "wood" ? 3.6 : 1.25,
       ),
-      guide.kind !== "done",
+      guide.kind !== "done" && guide.kind !== "build",
     );
     this.scene.render();
   }
@@ -926,6 +1008,7 @@ export class WorldView {
     return {
       renderer: "Babylon.js WebGL",
       keeper: this.keeper.metrics(),
+      crew: this.model.crew.workers,
       fps: Math.round(this.engine.getFps()),
       internalSize: [
         this.engine.getRenderWidth(),

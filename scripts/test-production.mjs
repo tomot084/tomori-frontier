@@ -7,7 +7,7 @@ const server = await preview({
 try {
   const child = spawn(
     process.execPath,
-    ["node_modules/@playwright/test/cli.js", "test"],
+    ["node_modules/@playwright/test/cli.js", "test", ...process.argv.slice(2)],
     {
       stdio: "inherit",
       env: {
@@ -21,5 +21,5 @@ try {
     child.on("exit", (code) => resolve(code ?? 1));
   });
 } finally {
-  await new Promise((resolve) => server.httpServer.close(resolve));
+  await server.close();
 }

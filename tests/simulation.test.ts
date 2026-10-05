@@ -135,3 +135,72 @@ it("guides the first handful to construction, then funds a visibly stronger tool
   const old = JSON.stringify(m.snapshot());
   expect(load(old)).toEqual(m.snapshot());
 });
+
+it("construction unlocks real helper harvesting and delivery without spending player inventory", () => {
+  const s = fresh();
+  const m = new GameModel(s);
+  run(m, 10000);
+  expect(m.crew.workers.some((w) => w.active)).toBe(false);
+  s.resources.wood = 20;
+  s.resources.stone = 10;
+  m.player = { x: 450, y: 682 };
+  run(m, 5000);
+  expect(s.zone).toBe(1);
+  m.player = { x: 690, y: 940 };
+  const inventory = { ...s.resources };
+  run(m, 35000);
+  expect(s.progress[1].wood + s.progress[1].stone).toBeGreaterThanOrEqual(5);
+  for (const kind of ["wood", "stone", "food"] as const)
+    expect(s.resources[kind]).toBe(inventory[kind]);
+  expect(s.resources.coin).toBeGreaterThanOrEqual(inventory.coin);
+  expect(m.crew.workers.filter((w) => w.active)).toHaveLength(1);
+  expect(m.events.some((e) => e.type === "deposit" && e.index === 1)).toBe(
+    true,
+  );
+  expect(s.zone).toBe(1); // Food must still be gathered and delivered by the player.
+});
+
+it("helpers can finish a funded gate, unlock a second helper and resume from existing saves", () => {
+  const s = fresh();
+  s.zone = 1;
+  s.progress[0] = { wood: 20, stone: 10, food: 0 };
+  s.progress[1] = { wood: 55, stone: 40, food: 8 };
+  s.x = 690;
+  s.y = 940;
+  const m = new GameModel(s);
+  run(m, 18000);
+  expect(s.zone).toBe(2);
+  expect(s.progress[1].stone).toBe(45);
+  expect(m.crew.workers.filter((w) => w.active)).toHaveLength(2);
+  expect(
+    m.events.filter((e) => e.type === "complete" && e.index === 1),
+  ).toHaveLength(1);
+  const restored = new GameModel(load(JSON.stringify(m.snapshot())));
+  run(restored, 100);
+  expect(restored.crew.workers.filter((w) => w.active)).toHaveLength(2);
+  const progressBefore = { ...restored.s.progress[2] };
+  run(restored, 30000);
+  expect(
+    restored.s.progress[2].wood + restored.s.progress[2].stone,
+  ).toBeGreaterThan(progressBefore.wood + progressBefore.stone);
+  expect(restored.s.progress[1]).toEqual({ wood: 55, stone: 45, food: 8 });
+});
+
+it("partial construction rewards survive reload without paying a milestone twice", () => {
+  const s = fresh();
+  s.zone = 1;
+  s.progress[0] = { wood: 20, stone: 10, food: 0 };
+  s.progress[1].wood = 26;
+  s.resources.wood = 1;
+  s.x = 450;
+  s.y = 1232;
+  const m = new GameModel(s);
+  run(m, 20);
+  expect(s.progress[1].wood).toBe(27);
+  expect(s.resources.coin).toBe(3);
+  const resumed = new GameModel(load(JSON.stringify(m.snapshot())));
+  resumed.s.resources.wood = 1;
+  run(resumed, 20);
+  expect(resumed.s.progress[1].wood).toBe(28);
+  expect(resumed.s.resources.coin).toBe(3);
+});

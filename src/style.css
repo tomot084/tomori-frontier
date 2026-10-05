@@ -998,3 +998,124 @@ dialog #close {
   border-color: #b99643;
   background: #fff0bf;
 }
+
+/* Clear construction progress and fewer overlapping field labels. */
+.goal-progress {
+  display: block;
+  margin-top: 6px;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(
+    to right,
+    #f7d27c var(--progress),
+    #ffffff26 var(--progress)
+  );
+}
+#goal small {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+}
+.enemy-health span {
+  display: none;
+}
+.enemy-health.engaged span {
+  display: block;
+}
+.camp-label {
+  font-size: 10px;
+}
+#unlock {
+  position: fixed;
+  z-index: 24;
+  top: calc(env(safe-area-inset-top) + 188px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: min(350px, calc(100% - 28px));
+  padding: 14px 18px;
+  background: #fff9e8f7;
+  border: 2px solid #efd082;
+  box-shadow:
+    0 5px 0 #3d594238,
+    0 12px 30px #375c4233;
+  border-radius: 20px;
+  pointer-events: none;
+  animation: unlock-in 0.28s ease-out;
+}
+#unlock i {
+  font-size: 36px;
+  color: #e2ac4b;
+  font-style: normal;
+}
+#unlock small,
+#unlock b,
+#unlock span {
+  display: block;
+}
+#unlock small {
+  color: #9b8250;
+  font-size: 10px;
+}
+#unlock b {
+  margin: 3px 0;
+  font-size: 18px;
+}
+#unlock span {
+  font-size: 11px;
+  line-height: 1.6;
+}
+@keyframes unlock-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+@media (min-width: 700px) {
+  #unlock {
+    top: 25px;
+  }
+}
+@media (max-height: 500px) {
+  #unlock {
+    top: 12px;
+    left: auto;
+    right: 12px;
+    transform: none;
+    width: 320px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #unlock {
+    animation: none;
+  }
+}
+
+.wordmark {
+  color: #fff8d7;
+  text-shadow:
+    0 1px 3px #254f4c,
+    0 1px 6px #254f4c;
+}
+.enemy-health.engaged span {
+  background: #334e4bd9;
+  padding: 2px 5px;
+  border-radius: 6px;
+}
+
+.site-label {
+  min-width: 128px;
+  padding: 7px 10px;
+}
+.site-label b {
+  font-size: 12px;
+}
+.site-label span {
+  font-size: 11px;
+}

@@ -12,6 +12,9 @@ import {
   type Save,
   type Upgrade,
 } from "./data";
+import { LanternCrew } from "./crew";
+const capFor = (kind: string, capacity: number) =>
+  kind === "food" ? Math.floor(capacity / 2) : capacity;
 export interface Point {
   x: number;
   y: number;
@@ -71,6 +74,7 @@ export class GameModel {
   readonly enemies: Enemy[] = [];
   readonly drops: DropItem[] = [];
   readonly events: GameEvent[] = [];
+  readonly crew = new LanternCrew(this);
   player: Point;
   time = 0;
   direction = 0;
@@ -179,6 +183,11 @@ export class GameModel {
       );
       if (i === 0 && kind === "wood" && progress.wood < b.cost.wood)
         remaining = Math.min(remaining, Math.max(0, 5 - this.s.resources.wood));
+      else
+        remaining = Math.min(
+          remaining,
+          Math.max(0, capFor(kind, st.capacity) - this.s.resources[kind]),
+        );
       if (!remaining) continue;
       const candidates = this.nodes.filter(
         (n) => n.kind === kind && !n.dead && n.zone <= i && n.y < b.y,
@@ -211,6 +220,53 @@ export class GameModel {
         vx: (Math.random() - 0.5) * 160,
         vy: -50 - Math.random() * 70,
       });
+  }
+  rewardConstruction(i: number) {
+    const b = buildingData[i],
+      total = Object.values(b.cost).reduce((a, n) => a + n, 0);
+    const delivered = Object.values(this.s.progress[i]).reduce(
+      (a, n) => a + n,
+      0,
+    );
+    if (i === 0 && (delivered === 5 || delivered === 10)) {
+      this.s.resources.coin += 4;
+      this.pop({ x: 450, y: b.y }, "橋板完成！ +4 灯貨");
+      this.burst({ x: 450, y: b.y }, 0xffdc88, 10);
+      this.toast(
+        delivered === 5
+          ? "橋板ができた！ もう一束届けると道具を強化できる"
+          : "道具を強化しよう。木を一撃で切れる！",
+      );
+      this.event("save", this.player);
+    } else if (
+      i > 0 &&
+      [0.25, 0.5, 0.75].some((ratio) => delivered === Math.ceil(total * ratio))
+    ) {
+      this.s.resources.coin += 3;
+      this.pop(
+        { x: 450, y: b.y },
+        `${Math.round((delivered / total) * 100)}% +3 灯貨`,
+      );
+      this.toast(`${b.name}の復旧が進んだ！ +3灯貨で装備を強化`);
+      this.event("save", this.player);
+    }
+  }
+  finishConstruction(i: number) {
+    if (this.s.zone !== i || !complete(this.s, i)) return;
+    const b = buildingData[i];
+    this.s.zone++;
+    this.s.resources.coin += [8, 12, 20][i];
+    this.event("complete", { x: 450, y: b.y }, { index: i });
+    this.burst({ x: 450, y: b.y }, 0xffdc88, 20);
+    this.toast(
+      i === 0
+        ? "橋が完成！ 運搬を手伝う灯りの精霊が仲間に"
+        : i === 1
+          ? "門が開いた！ 精霊が2体に増え、採集量もアップ"
+          : "三つの島に、暁の灯りが戻った！",
+    );
+    if (i === 2) this.s.won = true;
+    this.event("save", this.player);
   }
   snapshot(): Save {
     return structuredClone({ ...this.s, x: this.player.x, y: this.player.y });
@@ -263,7 +319,11 @@ export class GameModel {
         this.burst(n, resourceData[n.kind].color, 6);
         if (n.hp <= 0) {
           n.dead = time + gatherableData[n.kind].respawn * 1000;
-          this.spawn(n, n.kind, gatherableData[n.kind].yield);
+          this.spawn(
+            n,
+            n.kind,
+            gatherableData[n.kind].yield + (this.s.zone >= 2 ? 2 : 0),
+          );
           this.event("death", n, { id: n.id, kind: n.kind });
           if (!this.s.resources.wood && n.kind === "wood")
             this.toast("近づくと自動で採集。集めた木を橋へ！");
@@ -297,7 +357,7 @@ export class GameModel {
         dist = distance;
         nearest = e;
       }
-      if (distance < 230 && distance > d.range && !safe) {
+      if (distance < 145 && distance > d.range && !safe) {
         e.x += ((p.x - e.x) / distance) * d.speed * dt;
         e.y += ((p.y - e.y) / distance) * d.speed * dt;
       }
@@ -374,39 +434,12 @@ export class GameModel {
         );
         if (r) {
           this.event("deposit", p, { kind: r, index: i });
-          const delivered = Object.values(this.s.progress[i]).reduce(
-            (sum, count) => sum + count,
-            0,
-          );
-          if (i === 0 && (delivered === 5 || delivered === 10)) {
-            this.s.resources.coin += 4;
-            this.pop({ x: 450, y: b.y }, "橋板完成！ +4 灯貨");
-            this.burst({ x: 450, y: b.y }, 0xffdc88, 10);
-            this.toast(
-              delivered === 5
-                ? "橋板ができた！ もう一束届けると道具を強化できる"
-                : "道具を強化しよう。木を一撃で切れる！",
-            );
-            this.event("save", p);
-          }
-          if (complete(this.s, i)) {
-            this.s.zone++;
-            this.s.resources.coin += [8, 12, 20][i];
-            this.event("complete", { x: 450, y: b.y }, { index: i });
-            this.burst({ x: 450, y: b.y }, 0xffdc88, 20);
-            this.toast(
-              i === 0
-                ? "芽渡り橋が完成！ こだまの庭へ"
-                : i === 1
-                  ? "霧払い門が開いた！ 宵風の尾根へ"
-                  : "三つの島に、暁の灯りが戻った！",
-            );
-            if (i === 2) this.s.won = true;
-            this.event("save", p);
-          }
+          this.rewardConstruction(i);
+          this.finishConstruction(i);
         }
       }
     }
+    this.crew.step(dt);
     if (this.atCamp) this.s.hp = Math.min(st.hp, this.s.hp + 18 * dt);
     else if (
       this.s.hp < st.hp * 0.5 &&

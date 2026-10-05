@@ -25,7 +25,9 @@ export class Keeper {
     assetRoot.rotationQuaternion = null;
     assetRoot.rotation.y = Math.PI;
     // Match the existing feet, reach and collision dimensions.
-    assetRoot.scaling.scaleInPlace(0.75);
+    assetRoot.scaling.x *= 0.84;
+    assetRoot.scaling.y *= 0.71;
+    assetRoot.scaling.z *= 0.84;
     rig.toolPivot.parent = rig.root;
     const oldBody = rig.body;
     oldBody.dispose();
@@ -45,12 +47,14 @@ export class Keeper {
       source.metallic = 0;
       source.roughness = 1;
       source.albedoColor = Color3.White();
-      source.unlit = true;
+      source.unlit = false;
+      source.albedoColor = new Color3(1.22, 1.25, 1.18);
+      source.environmentIntensity = 0.25;
       source.backFaceCulling = false;
       source.emissiveColor = Color3.Black();
       if (mesh.name === "Cloak") {
         const cloth = new StandardMaterial("tomori-hood", art.scene);
-        cloth.diffuseColor = new Color3(0.23, 0.66, 0.68);
+        cloth.diffuseColor = new Color3(0.25, 0.7, 0.7);
         cloth.specularColor = Color3.Black();
         cloth.backFaceCulling = false;
         mesh.material = cloth;
@@ -97,6 +101,7 @@ export class Keeper {
     );
     lantern.parent = rig.torso;
     const head = container.transformNodes.find((n) => n.name === "Head")!;
+    head.scaling.scaleInPlace(1.12);
     for (const side of [-1, 1]) {
       const eye = art.sphere(
         "keeper-eye",
