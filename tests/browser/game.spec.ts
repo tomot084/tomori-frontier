@@ -32,10 +32,14 @@ for (const size of [
     const initial = await state(page);
     if (size.width > 500) {
       await page.keyboard.down("ArrowRight");
-      await page.waitForTimeout(350);
+      await expect
+        .poll(async () => (await state(page)).x)
+        .toBeGreaterThan(initial.x + 15);
       await page.keyboard.up("ArrowRight");
       await page.keyboard.down("W");
-      await page.waitForTimeout(200);
+      await expect
+        .poll(async () => (await state(page)).y)
+        .toBeLessThan(initial.y - 15);
       await page.keyboard.up("W");
     } else {
       const session = await context.newCDPSession(page);
