@@ -60,7 +60,7 @@ function boot() {
     el("intro").remove();
     started = true;
     movement.enabled = true;
-    ui.toast("左下をドラッグして移動。採集と戦闘は自動！");
+    ui.toast("フィールドをドラッグして移動。採集と戦闘は自動！");
     ui.update(started);
   };
   el("settings").onclick = () => {
@@ -151,6 +151,10 @@ function boot() {
       if (event.type === "toast") ui.toast(event.text!);
       else if (event.type === "save") persist();
       else {
+        if (event.type === "pickup") {
+          ui.update(started);
+          ui.pulse(event.kind!);
+        }
         view.effects(event);
         if (event.type === "deposit" || event.type === "complete")
           view.syncSites();

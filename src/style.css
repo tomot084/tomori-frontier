@@ -781,3 +781,145 @@ dialog #close {
 .enemy-health i {
   background: linear-gradient(#ff9a78, #e86256);
 }
+/* Field-first hierarchy and clear, responsive rewards. */
+.wordmark {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+.resource-chip {
+  background: linear-gradient(145deg, #fffced, #efebd5);
+  border-bottom: 3px solid #d6d8ba;
+}
+.resource-chip strong {
+  font-size: 24px;
+  font-weight: 900;
+}
+.objective {
+  background: #215c60ed;
+  border-color: #7dab94;
+  border-radius: 12px;
+  max-width: 355px;
+}
+#goal b {
+  font-size: 13px;
+}
+#goal b em {
+  font-size: 11px;
+  font-style: normal;
+  color: #ffe2a0;
+  margin-left: 8px;
+}
+#goal small {
+  font-size: 11px;
+  color: #e1ead8;
+}
+#goal small span {
+  color: #ffe4a8;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+#toast {
+  top: auto;
+  bottom: calc(env(safe-area-inset-bottom) + 172px);
+  padding: 8px 14px;
+  font-size: 12px;
+  border-radius: 12px;
+}
+.float-number {
+  font-size: 20px;
+  -webkit-text-stroke: 2px #315448;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 0 #315448;
+}
+#stick {
+  border-color: #fff8dba0;
+  background: #244c5026;
+}
+#stick > div {
+  background: #fff9e399;
+  border-color: #fff9dc;
+}
+#stick:after {
+  content: "ドラッグで移動";
+  position: absolute;
+  top: 112px;
+  left: -15px;
+  width: 134px;
+  text-align: center;
+  color: #fffae6;
+  font-size: 10px;
+  text-shadow: 0 1px 3px #294e50;
+}
+#stick.active:after {
+  opacity: 0;
+}
+#shop-toggle.upgrade-ready {
+  border-color: #ffda80;
+  box-shadow:
+    0 4px 0 #796c3d55,
+    0 0 0 4px #ffdb8340;
+}
+#shop-toggle.upgrade-ready small {
+  color: #866323;
+}
+.resource-chip.collected {
+  animation: collected 0.28s ease-out;
+}
+.site-label.depositing {
+  animation: deposited 0.3s ease-out;
+}
+@keyframes collected {
+  35% {
+    box-shadow:
+      0 0 0 4px #ffe9a8,
+      0 5px 14px #c9a86c66;
+    background: #fff0bd;
+  }
+}
+@keyframes deposited {
+  40% {
+    background: #ffe1a2;
+    box-shadow: 0 0 0 4px #ffe9a84d;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .resource-chip.collected,
+  .site-label.depositing {
+    animation: none;
+  }
+}
+@media (max-height: 550px) {
+  #goal small {
+    display: block;
+  }
+  #toast {
+    bottom: 15px;
+  }
+  #stick:after {
+    display: none;
+  }
+}
+.enemy-health {
+  overflow: visible;
+}
+.enemy-health i {
+  max-width: 100%;
+}
+.enemy-health span {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff4df;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 3px #423748,
+    1px 0 2px #423748;
+}
+@media (hover: hover) and (pointer: fine) {
+  #stick:after {
+    content: "WASD / 矢印で移動";
+  }
+}

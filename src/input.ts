@@ -33,8 +33,7 @@ export class MovementInput {
       if (
         !this.enabled ||
         this.stick.id !== -1 ||
-        e.clientX > innerWidth * 0.58 ||
-        e.clientY < innerHeight * 0.45
+        e.clientY < innerHeight * 0.25
       )
         return;
       e.preventDefault();

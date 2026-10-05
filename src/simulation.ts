@@ -42,6 +42,7 @@ export interface DropItem extends Point {
 }
 export interface GameEvent extends Point {
   type:
+    | "pickup"
     | "swing"
     | "hit"
     | "pop"
@@ -311,7 +312,7 @@ export class GameModel {
         d.y += ((p.y - d.y) / Math.max(1, distance)) * move;
         if (distance < 15) {
           this.s.resources[d.kind]++;
-          this.pop(p, `+1 ${resourceData[d.kind].name}`);
+          this.event("pickup", p, { kind: d.kind, count: 1 });
           this.drops.splice(i, 1);
           continue;
         }

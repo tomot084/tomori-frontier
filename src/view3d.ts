@@ -49,6 +49,7 @@ export class WorldView {
   actors = new Map<string, Actor>();
   dropMeshes = new Map<string, Mesh>();
   enemyBars = new Map<string, HTMLElement>();
+  dangerRings = new Map<string, Mesh>();
   siteLabels: HTMLElement[] = [];
   campLabels: HTMLElement[] = [];
   particles: Fragment[] = [];
@@ -67,6 +68,13 @@ export class WorldView {
   shadowListKey = "";
   visibleActors = 0;
   quality = "balanced";
+  pickupBatches = new Map<
+    string,
+    { count: number; at: number; x: number; y: number }
+  >();
+  cargoBounceAt = -100;
+  depositAt = [-100, -100, -100];
+  playerRing!: Mesh;
   constructor(
     public canvas: HTMLCanvasElement,
     public model: GameModel,
@@ -127,6 +135,13 @@ export class WorldView {
     this.rig = this.art.player();
     this.rig.root.scaling.setAll(1.25);
     this.rig.root.rotation.y = Math.PI;
+    this.playerRing = MeshBuilder.CreateTorus(
+      "keeper-foot-ring",
+      { diameter: 1.28, thickness: 0.045, tessellation: 32 },
+      this.scene,
+    );
+    this.art.tint(this.playerRing, 0xffe5a1);
+    this.playerRing.position.y = 0.06;
     for (const n of model.nodes) {
       const root = new TransformNode(n.id, this.scene);
       root.position.copyFrom(worldPoint(n.x, n.y));
@@ -179,7 +194,18 @@ export class WorldView {
       });
       const bar = document.createElement("div");
       bar.className = "enemy-health";
-      bar.innerHTML = "<i></i>";
+      bar.innerHTML = `<i></i><span>${enemyData[e.type].name}</span>`;
+      const danger = MeshBuilder.CreateTorus(
+        "enemy-warning",
+        {
+          diameter: e.type === 1 ? 1.6 : 1.2,
+          thickness: 0.035,
+          tessellation: 20,
+        },
+        this.scene,
+      );
+      this.art.tint(danger, 0xe68d73);
+      this.dangerRings.set(e.id, danger);
       overlay.append(bar);
       this.enemyBars.set(e.id, bar);
     }
@@ -329,6 +355,20 @@ export class WorldView {
     return v;
   }
   effects(event: GameEvent) {
+    if (event.type === "pickup") {
+      this.cargoBounceAt = this.time;
+      const key = event.kind!;
+      const batch = this.pickupBatches.get(key);
+      if (batch) batch.count++;
+      else
+        this.pickupBatches.set(key, {
+          count: 1,
+          at: this.time,
+          x: event.x,
+          y: event.y,
+        });
+      this.pulse(worldPoint(event.x, event.y, 0.2), 0xffdf93, 0.32, 0.65);
+    }
     if (event.type === "swing") {
       const p = this.model.player;
       this.swing = {
@@ -371,6 +411,12 @@ export class WorldView {
       }
     }
     if (event.type === "death") {
+      this.pulse(
+        worldPoint(event.x, event.y, 0.15),
+        event.kind === "enemy" ? 0xffc970 : 0xffe6aa,
+        0.55,
+        2.2,
+      );
       const a = this.actors.get(event.id || "");
       if (a) a.dieAt = this.time;
     }
@@ -384,15 +430,44 @@ export class WorldView {
     }
     if (event.type === "pop") this.float(event);
     if (event.type === "burst") this.burst(event);
-    if (event.type === "deposit") this.flyingDeposit(event);
+    if (event.type === "deposit") {
+      this.depositAt[event.index!] = this.time;
+      this.flyingDeposit(event);
+      this.siteLabels[event.index!].classList.remove("depositing");
+      void this.siteLabels[event.index!].offsetWidth;
+      this.siteLabels[event.index!].classList.add("depositing");
+    }
     if (event.type === "complete") {
       this.shakeUntil = this.time + 0.22;
       this.syncSites();
+      this.pulse(worldPoint(event.x, event.y, 0.2), 0xffedac, 0.9, 3.7);
+      this.float({ ...event, type: "pop", text: "完成！", color: 0xffebae });
     }
     if (event.type === "upgrade") {
       this.actors.get("player")!.hitAt = this.time + 0.05;
       this.syncCargo();
     }
+  }
+  pulse(origin: Vector3, hex: number, life: number, size: number) {
+    if (this.particles.length >= 48) return;
+    const mesh = MeshBuilder.CreateTorus(
+      "reward-ripple",
+      { diameter: 1, thickness: 0.045, tessellation: 24 },
+      this.scene,
+    );
+    const mat = new StandardMaterial("ripple-light", this.scene);
+    mat.disableLighting = true;
+    mat.emissiveColor = color(hex);
+    mat.alpha = 0.85;
+    mesh.material = mat;
+    mesh.metadata = { ripple: true, size };
+    this.particles.push({
+      mesh,
+      origin,
+      born: this.time,
+      velocity: Vector3.Zero(),
+      life,
+    });
   }
   float(e: GameEvent) {
     if (this.floats.length >= 32) return;
@@ -504,6 +579,17 @@ export class WorldView {
     this.time += dt;
     const m = this.model;
     this.syncCargo();
+    for (const [kind, batch] of this.pickupBatches)
+      if (this.time - batch.at > 0.22) {
+        this.float({
+          type: "pop",
+          x: batch.x,
+          y: batch.y,
+          text: `+${batch.count} ${resourceData[kind as keyof typeof resourceData].name}`,
+          color: 0xffe9aa,
+        });
+        this.pickupBatches.delete(kind);
+      }
     const desired = worldPoint(m.player.x, m.player.y + 85);
     Vector3.LerpToRef(
       this.target,
@@ -522,7 +608,21 @@ export class WorldView {
     p.root.position.copyFrom(worldPoint(m.player.x, m.player.y));
     p.shadow.position.copyFrom(p.root.position);
     p.shadow.position.y = 0.037;
-    const swingAge = this.time - this.swing.at,
+    this.playerRing.position.copyFrom(p.root.position);
+    this.playerRing.position.y = 0.065;
+    const cargoAge = this.time - this.cargoBounceAt;
+    this.rig.cargoRoot.rotation.z = Math.sin(this.time * 9) * m.moving * 0.025;
+    this.rig.cargoRoot.position.y =
+      1.12 +
+      (cargoAge < 0.32 ? Math.sin((cargoAge / 0.32) * Math.PI) * 0.13 : 0);
+    const rawSwingAge = this.time - this.swing.at;
+    // Briefly hold the striking pose, keeping movement and progression responsive.
+    const swingAge =
+        rawSwingAge < 0.12
+          ? rawSwingAge
+          : rawSwingAge < 0.17
+            ? 0.12
+            : rawSwingAge - 0.05,
       phase = swingAge / 0.38,
       walk = Math.sin(this.time * 13) * m.moving;
     this.rig.legs[0].rotation.x = walk * 0.48;
@@ -545,16 +645,19 @@ export class WorldView {
     }
     for (const [kind, mesh] of Object.entries(this.rig.tools))
       mesh.setEnabled(
-        phase >= 0 &&
+        (phase >= 0 &&
           phase < 1 &&
           this.swing.kind !== "food" &&
-          kind === this.swing.kind,
+          kind === this.swing.kind) ||
+          (phase >= 1 && kind === "wood"),
       );
     this.trail.setEnabled(phase > 0.3 && phase < 0.85);
     this.trail.position.copyFrom(p.root.position);
     this.trail.rotation.y = p.root.rotation.y;
     this.ring.scaling.setAll(1 + Math.sin(this.time * 18) * 0.025);
-    const casters: Mesh[] = [this.rig.body],
+    const casters: Mesh[] = this.rig.root
+        .getChildMeshes()
+        .filter((mesh) => mesh.isEnabled()) as Mesh[],
       radius = Math.max(17, (this.camera.orthoRight || 5) + 8);
     this.visibleActors = 0;
     for (const n of m.nodes) {
@@ -600,6 +703,11 @@ export class WorldView {
           Math.hypot(e.x - m.player.x, e.y - m.player.y) < radius * 40;
       a.root.setEnabled(visible);
       a.shadow.setEnabled(visible);
+      const danger = this.dangerRings.get(e.id)!;
+      danger.setEnabled(visible && !dying);
+      danger.position.copyFrom(worldPoint(e.x, e.y, 0.06));
+      danger.visibility =
+        Math.hypot(e.x - m.player.x, e.y - m.player.y) < 230 ? 0.9 : 0.35;
       const bar = this.enemyBars.get(e.id)!;
       if (!visible) {
         bar.hidden = true;
@@ -612,7 +720,16 @@ export class WorldView {
           ? 0.15 + Math.sin(this.time * 7) * 0.11
           : Math.abs(Math.sin(this.time * 7 + e.x)) * 0.04;
       a.root.rotation.y = Math.atan2(m.player.x - e.x, -(m.player.y - e.y));
-      a.root.scaling.setAll(dying ? Math.max(0.01, 1 - age / 0.26) : 1.22);
+      const hitAge = this.time - a.hitAt;
+      const recoil =
+        hitAge >= 0 && hitAge < 0.22 ? Math.sin((hitAge / 0.22) * Math.PI) : 0;
+      a.root.scaling.set(
+        1.22 + recoil * 0.18,
+        1.22 - recoil * 0.16,
+        1.22 + recoil * 0.18,
+      );
+      if (dying) a.root.scaling.setAll(Math.max(0.01, 1 - age / 0.26));
+      a.mesh.rotation.z = recoil * 0.13;
       a.shadow.position.copyFrom(a.root.position);
       a.shadow.position.y = 0.035;
       a.mesh.renderOverlay = this.time > a.hitAt && this.time < a.hitAt + 0.14;
@@ -634,8 +751,10 @@ export class WorldView {
     this.scenery.zones.forEach((meshes, i) => {
       for (const mesh of meshes) {
         const underCanopy =
-          mesh.name === "lantern-workshop" &&
-          Vector3.DistanceSquared(mesh.position, p.root.position) < 1.9;
+          (mesh.name === "lantern-workshop" ||
+            mesh.name.startsWith("border-tree-")) &&
+          Vector3.DistanceSquared(mesh.position, p.root.position) <
+            (mesh.name.startsWith("border-tree-") ? 5 : 1.9);
         mesh.visibility = i <= m.s.zone ? (underCanopy ? 0.3 : 1) : 1;
       }
     });
@@ -674,12 +793,17 @@ export class WorldView {
       mesh.setEnabled(d.age > 0.1);
       mesh.position.copyFrom(worldPoint(d.x, d.y, h));
       mesh.rotation.y = this.time * 2;
-      mesh.scaling.setAll(d.kind === "wood" ? 0.65 : 1);
+      const near = Math.hypot(d.x - m.player.x, d.y - m.player.y);
+      mesh.scaling.setAll(
+        (d.kind === "wood" ? 0.85 : 1.2) *
+          (d.age > 0.3 ? Math.min(1, 0.45 + near / 60) : 1),
+      );
     }
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const f = this.particles[i],
         age = this.time - f.born;
       if (age > f.life) {
+        if (f.mesh.metadata?.ripple) f.mesh.material?.dispose();
         f.mesh.dispose();
         this.particles.splice(i, 1);
         continue;
@@ -687,7 +811,10 @@ export class WorldView {
       f.mesh.setEnabled(age >= 0);
       if (age < 0) continue;
       f.mesh.position.copyFrom(f.origin).addInPlace(f.velocity.scale(age));
-      if (f.mesh.metadata?.delivery)
+      if (f.mesh.metadata?.ripple) {
+        f.mesh.scaling.setAll(0.35 + (age / f.life) * f.mesh.metadata.size);
+        (f.mesh.material as StandardMaterial).alpha = 0.85 * (1 - age / f.life);
+      } else if (f.mesh.metadata?.delivery)
         f.mesh.position.y += Math.sin((age / f.life) * Math.PI) * 0.7;
       else {
         f.mesh.position.y -= 5 * age * age;
@@ -717,6 +844,13 @@ export class WorldView {
     }
     this.scenery.sites.forEach((site, i) => {
       const label = this.siteLabels[i];
+      const age = this.time - this.depositAt[i];
+      site.marker.scaling.setAll(
+        1 +
+          (age < 0.4
+            ? Math.sin((age / 0.4) * Math.PI) * 0.18
+            : Math.sin(this.time * 3) * 0.025),
+      );
       this.place(
         label,
         worldPoint(450, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1),

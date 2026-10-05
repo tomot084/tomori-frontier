@@ -1,3 +1,6 @@
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
@@ -77,12 +80,42 @@ function island(art: Art, zone: number, start: number, end: number) {
   data.positions = positions;
   data.indices = indices;
   data.colors = colors;
+  data.uvs = positions.flatMap((_, i) =>
+    i % 3 === 0 ? [(positions[i] + 12) / 24, (positions[i + 2] + 45) / 60] : [],
+  );
   const normals: number[] = [];
   VertexData.ComputeNormals(positions, indices, normals);
   data.normals = normals;
   const m = new Mesh("bevelled-island-" + zone, art.scene);
   data.applyToMesh(m);
-  m.material = art.material;
+  const tex = new DynamicTexture(
+    "painted-meadow-" + zone,
+    { width: 512, height: 512 },
+    art.scene,
+    false,
+  );
+  const ctx = tex.getContext() as CanvasRenderingContext2D;
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 160; i++) {
+    const x = rand(i + zone * 71) * 512,
+      y = rand(i + 437) * 512,
+      r = 15 + rand(i + 98) * 45;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, i % 2 ? "rgba(58,110,56,.13)" : "rgba(245,235,180,.2)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  for (let i = 0; i < 1800; i++) {
+    ctx.fillStyle = i % 2 ? "#e9ecd02a" : "#417a4920";
+    ctx.fillRect(rand(i) * 512, rand(i + 1884) * 512, 1.5, 1);
+  }
+  tex.update();
+  const mat = new StandardMaterial("meadow-surface-" + zone, art.scene);
+  mat.diffuseTexture = tex;
+  mat.specularColor = Color3.Black();
+  m.material = mat;
   m.receiveShadows = true;
   m.isPickable = false;
   return m;
@@ -107,29 +140,6 @@ export function makeScenery(art: Art) {
   ranges.forEach(([start, end], zone) => {
     zones[zone].push(island(art, zone, start, end));
     const details: Mesh[] = [];
-    // Low, irregular meadow colour patches break up the broad ground plane.
-    for (let i = 0; i < 28; i++) {
-      const patch = MeshBuilder.CreateDisc(
-        "meadow-colour",
-        {
-          radius: 0.8 + rand(i) * 0.9,
-          tessellation: 18,
-          sideOrientation: Mesh.DOUBLESIDE,
-        },
-        art.scene,
-      );
-      patch.rotation.x = Math.PI / 2;
-      art.tint(patch, i % 2 ? 0x92ba7b : 0x9bc382);
-      patch.position.copyFrom(
-        worldPoint(
-          115 + rand(i + 8) * 660,
-          start + 35 + rand(i + 30) * (end - start - 70),
-          0.023,
-        ),
-      );
-      patch.scaling.z = 0.65;
-      details.push(patch);
-    }
     // Continuous curved ribbon, avoiding overlapping triangulated path discs.
     const pathEdges = [-1, 1].map((side) =>
       Array.from({ length: 32 }, (_, j) => {
@@ -158,7 +168,9 @@ export function makeScenery(art: Art) {
       const tree = art.tree(i + zone * 47);
       tree.scaling.setAll(0.7 + rand(i + 4) * 0.25);
       tree.position.copyFrom(worldPoint(x, y));
-      details.push(tree);
+      tree.name = `border-tree-${zone}-${i}`;
+      tree.freezeWorldMatrix();
+      zones[zone].push(tree);
     }
     for (let i = 0; i < 100; i++) {
       const x = 95 + rand(i + zone * 200) * 710,
@@ -527,6 +539,33 @@ export function makeScenery(art: Art) {
         );
       }
     }
+    const sign = art.cylinder(
+      "worksite-signpost",
+      1.7,
+      0.55,
+      -0.5,
+      0.045,
+      0.065,
+      1.1,
+      palette.wood,
+      6,
+    );
+    baseParts.push(
+      sign,
+      art.box("worksite-sign", 1.7, 0.95, -0.5, 0.55, 0.3, 0.06, palette.teal),
+    );
+    baseParts.push(
+      art.box(
+        "worksite-sign-stripe",
+        1.7,
+        0.95,
+        -0.54,
+        0.3,
+        0.045,
+        0.025,
+        palette.gold,
+      ),
+    );
     const base = art.merge("foundation-" + i, baseParts);
     base.parent = root;
     marker = MeshBuilder.CreateTorus(

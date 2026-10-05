@@ -81,3 +81,29 @@ it("heals safely at workshops and returns on defeat without losing materials", (
   expect(m.s.resources.wood).toBe(13);
   expect(m.s.hp).toBe(80);
 });
+
+it("emits pickup rewards only when a real drop fits the inventory", () => {
+  const m = new GameModel(fresh());
+  m.spawn(m.player, "wood", 2);
+  for (const drop of m.drops) {
+    drop.age = 0.4;
+    drop.x = m.player.x;
+    drop.y = m.player.y;
+  }
+  run(m, 20);
+  expect(m.s.resources.wood).toBe(2);
+  expect(m.events.filter((e) => e.type === "pickup")).toHaveLength(2);
+  expect(
+    m.events
+      .filter((e) => e.type === "pickup")
+      .every((e) => e.kind === "wood" && e.count === 1),
+  ).toBe(true);
+  m.s.resources.wood = 20;
+  m.events.length = 0;
+  m.spawn(m.player, "wood", 1);
+  m.drops[0].age = 0.4;
+  run(m, 20);
+  expect(m.s.resources.wood).toBe(20);
+  expect(m.events.some((e) => e.type === "pickup")).toBe(false);
+  expect(m.drops).toHaveLength(1);
+});

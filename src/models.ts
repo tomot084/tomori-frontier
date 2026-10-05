@@ -225,18 +225,18 @@ export class Art {
       parts.push(branch);
     }
     // Rounded, layered crowns with a readable silhouette and golden lantern fruit.
-    const hues = [0x39866c, 0x52a577, 0x84c879, 0xb2dd88];
-    for (let i = 0; i < 7; i++) {
+    const hues = [0x297e68, 0x459c72, 0x7aba6c, 0xa6d779];
+    for (let i = 0; i < 5; i++) {
       const angle = i * 2.399 + seed * 0.13;
-      const upper = i > 3;
+      const upper = i > 2;
       parts.push(
         this.sphere(
           "leaf-cushion",
-          Math.cos(angle) * (upper ? 0.38 : 0.62),
-          upper ? 2.45 + (i - 4) * 0.17 : 1.92 + (i % 2) * 0.17,
-          Math.sin(angle) * (upper ? 0.32 : 0.5),
-          upper ? 1.42 : 1.65,
-          upper ? 1.22 : 1.34,
+          Math.cos(angle) * (upper ? 0.25 : 0.48),
+          upper ? 2.5 + (i - 3) * 0.22 : 1.95 + (i % 2) * 0.16,
+          Math.sin(angle) * (upper ? 0.25 : 0.4),
+          upper ? 1.65 : 1.95,
+          upper ? 1.05 : 1.2,
           1.45,
           hues[upper ? 2 + (i % 2) : i % 2],
         ),
@@ -274,7 +274,19 @@ export class Art {
       0xe3d9a4,
     );
     vein.rotation.z = 0.48;
-    return this.merge("split-moonstone", [a, b, vein]);
+    const crystal = this.cylinder(
+      "moonstone-crystal",
+      0.36,
+      0.76,
+      0.17,
+      0,
+      0.12,
+      0.57,
+      0xe5eee1,
+      5,
+    );
+    crystal.rotation.z = -0.32;
+    return this.merge("split-moonstone", [a, b, vein, crystal]);
   }
   berry() {
     const parts: Mesh[] = [];
@@ -623,9 +635,7 @@ export class Art {
       torso = new TransformNode("torso-pivot", this.scene);
     torso.parent = root;
     const p: Mesh[] = [];
-    p.push(
-      this.cylinder("coat", 0, 0.91, 0, 0.27, 0.35, 0.65, palette.teal, 10),
-    );
+    p.push(this.cylinder("coat", 0, 0.91, 0, 0.3, 0.4, 0.65, palette.teal, 12));
     p.push(
       this.sphere(
         "coat-shoulders",
@@ -714,6 +724,25 @@ export class Art {
       );
     }
     p.push(this.sphere("nose", 0, 1.46, 0.342, 0.105, 0.095, 0.11, 0xf3c78b));
+    p.push(
+      this.cylinder(
+        "coat-trim",
+        0,
+        0.63,
+        0,
+        0.38,
+        0.4,
+        0.07,
+        palette.cream,
+        12,
+      ),
+    );
+    p.push(
+      this.box("coat-seam", 0, 0.93, 0.315, 0.04, 0.42, 0.035, palette.cream),
+    );
+    p.push(
+      this.sphere("coat-clasp", 0, 1.12, 0.34, 0.09, 0.09, 0.04, palette.gold),
+    );
     p.push(this.box("backpack", 0, 0.99, -0.32, 0.49, 0.56, 0.27, 0xbe9769));
     for (const x of [-0.21, 0.21])
       p.push(

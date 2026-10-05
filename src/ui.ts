@@ -1,4 +1,5 @@
 import {
+  buildingData,
   resourceData,
   stats,
   cost,
@@ -30,6 +31,15 @@ export class GameUI {
   toastTimer = 0;
   lastShop = "";
   lastResources = "";
+  lastGoal = "";
+  pulse(kind: string) {
+    const chip = document.querySelector(`[data-resource="${kind}"]`);
+    if (chip) {
+      chip.classList.remove("collected");
+      void (chip as HTMLElement).offsetWidth;
+      chip.classList.add("collected");
+    }
+  }
   constructor(
     public model: GameModel,
     private buy: (u: Upgrade) => void,
@@ -63,19 +73,36 @@ export class GameUI {
       st = stats(s);
     const key = JSON.stringify(s.resources) + st.capacity;
     if (key !== this.lastResources) {
-      el("resources").innerHTML = (
-        ["wood", "stone", "food", "coin"] as Resource[]
-      )
-        .map((r) => {
+      if (!el("resources").children.length)
+        el("resources").innerHTML = (
+          ["wood", "stone", "food", "coin"] as Resource[]
+        )
+          .map((r) => {
+            const cap =
+              r === "coin"
+                ? null
+                : r === "food"
+                  ? Math.floor(st.capacity / 2)
+                  : st.capacity;
+            return `<div class="resource-chip ${r}${cap && s.resources[r] >= cap ? " full" : ""}" data-resource="${r}">${icons[r]}<strong>${s.resources[r]}</strong><small>${r === "wood" ? "木材" : r === "stone" ? "石材" : r === "food" ? "灯実" : "灯貨"}${cap ? ` <span>/ ${cap}</span>` : ""}</small></div>`;
+          })
+          .join("");
+      else
+        for (const r of ["wood", "stone", "food", "coin"] as Resource[]) {
+          const chip = el("resources").querySelector<HTMLElement>(
+            `[data-resource="${r}"]`,
+          )!;
           const cap =
             r === "coin"
               ? null
               : r === "food"
                 ? Math.floor(st.capacity / 2)
                 : st.capacity;
-          return `<div class="resource-chip ${r}${cap && s.resources[r] >= cap ? " full" : ""}" data-resource="${r}">${icons[r]}<strong>${s.resources[r]}</strong><small>${r === "wood" ? "木材" : r === "stone" ? "石材" : r === "food" ? "灯実" : "灯貨"}${cap ? ` <span>/ ${cap}</span>` : ""}</small></div>`;
-        })
-        .join("");
+          chip.querySelector("strong")!.textContent = String(s.resources[r]);
+          chip.classList.toggle("full", !!cap && s.resources[r] >= cap);
+          const capLabel = chip.querySelector("small span");
+          if (capLabel) capLabel.textContent = `/ ${cap}`;
+        }
       this.lastResources = key;
     }
     el("hp").style.width = `${(s.hp / st.hp) * 100}%`;
@@ -88,11 +115,48 @@ export class GameUI {
       "霧払い門を復旧しよう",
       "暁の灯台に光をともそう",
     ];
-    el("goal").innerHTML = s.won
-      ? "<b>三つの島に、灯りが戻った！</b><small>探索と強化を続けられます</small>"
-      : `<b>${names[s.zone]}</b><small>素材を集めて、建設地点へ運ぼう</small>`;
+    const goalKey = JSON.stringify([
+      s.zone,
+      s.progress,
+      s.resources,
+      s.won,
+      Math.round(this.model.player.x / 30),
+      Math.round(this.model.player.y / 30),
+    ]);
+    if (goalKey !== this.lastGoal) {
+      this.lastGoal = goalKey;
+      if (s.won)
+        el("goal").innerHTML =
+          "<b>三つの島に、灯りが戻った！</b><small>探索と強化を続けられます</small>";
+      else {
+        const b = buildingData[s.zone],
+          p = s.progress[s.zone];
+        const needs = (["wood", "stone", "food"] as const).filter(
+          (r) => b.cost[r] > p[r],
+        );
+        const ready = needs.every((r) => s.resources[r] >= b.cost[r] - p[r]);
+        const total = Object.values(b.cost).reduce((a, n) => a + n, 0),
+          done = Object.values(p).reduce((a, n) => a + n, 0);
+        const target = { x: 450, y: b.y };
+        const dx = target.x - this.model.player.x,
+          dy = target.y - this.model.player.y;
+        const sx = dx * 0.91 + dy * 0.414,
+          sy = -dx * 0.414 + dy * 0.91;
+        const arrows = ["→", "↘", "↓", "↙", "←", "↖", "↑", "↗"];
+        const arrow =
+          arrows[(Math.round(Math.atan2(sy, sx) / (Math.PI / 4)) + 8) % 8];
+        el("goal").innerHTML =
+          `<b>${names[s.zone]} <em>${Math.round((done / total) * 100)}%</em></b><small>${ready ? "素材が揃った！ 建築地点へ" : needs.map((r) => `${resourceData[r].name} あと${Math.max(0, b.cost[r] - p[r] - s.resources[r])}`).join(" · ")} <span>${arrow} 建築へ</span></small>`;
+      }
+    }
     const show =
       started && this.model.atCamp && (s.zone > 0 || s.resources.coin > 0);
+    el("shop-toggle").classList.toggle(
+      "upgrade-ready",
+      (Object.keys(upgradeData) as Upgrade[]).some(
+        (u) => s.levels[u] < 5 && s.resources.coin >= cost(s, u),
+      ),
+    );
     this.shopShown = show;
     el("shop").hidden = !show;
     if (!show && this.shopOpen) this.toggleShop(false);
