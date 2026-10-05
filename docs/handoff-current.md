@@ -43,7 +43,18 @@
 
 `dist` は `index.html`、ビルドされたJS/CSS、採用人物 `models/keeper.glb` のみ。木の形状はJSに内包。参考画像、作者プレビュー、候補素材、パック原本、作業スクリプトの実行結果、スクリーンショット、文書はdistへ入らない。`input/` と `screenshots/` は引き続きignore、参考画像は追跡されていない。
 
-公開結果は実際のPages更新後に下記へ記録する。
+## 今回の公開確認
+
+- 公開ソースcommit：`495a949456ba9b22185f1e39efd3a3f8b66d622e`。mainへpush済み。
+- Actions： https://github.com/tomot084/tomori-frontier/actions/runs/37287294674 。build / deployとも成功。CIでも単体テスト・ブラウザ8件・production build・dist監査成功。
+- 公開URL： https://tomot084.github.io/tomori-frontier/ 。公開版を390×844、412×915、1280×720で実ブラウザ確認し、実際の採集・荷物・HUD更新を確認。console error / warning 0、asset 404 0、外部オリジン通信0。
+- 公開比較画像：`screenshots/assets-published-{390,412,1280}.png`、採集後は `assets-published-gather-{390,412,1280}.png`。スマホ・PCの画像を実際に開いて最終比較。今回のPC開始画面は地形・人物とも正常に表示された。前回記録の撮影フレーム欠落について、根本原因を解消したとまでは主張していない。
+- 公開JS `index-ChCsDpI6.js` のSHA-256はローカル最終buildと一致：`160c1a5f411767ec0d820ef9dff23e45c66d9ebe0a70581fd9ac025789df9f1d`。
+- 公開GLBもローカル最終buildと一致：`ecdd4b59e1d3d012262adf7067c84bd06101be79109b28ce9407679f2a37a800`。
+- 同じ390幅・採集地点の観測では、描画三角形数は旧版36,958 → 今回28,634。公開版のメッシュ数328。これはソフトウェアWebGLでの表示確認であり、物理スマホでのFPS測定ではない。
+- `input/`、`screenshots/`、`dist/` の追跡ファイル0。参考画像や候補原本はcommit/pushしていない。
+
+この公開確認追記は文書だけのcommit（CI skip）。ゲーム配信ファイル・実装・CIで検証してdeployした対象は上記の公開ソースcommit。
 
 ---
 
