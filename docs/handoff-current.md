@@ -45,7 +45,16 @@
 - `screenshots/finish-final-{390,412,1280}.png`、`finish-final-zone{1,2}-390.png`。390では実採集だけで木20・石10を集めて橋を建て、精霊の運搬まで進行し `finish-final-carry-390.png` / `finish-final-unlock-390.png` / `finish-final-crew-390.png` を保存。AudioContextがrunningで音キューも生成されていることを確認。表示・入力の確認はブラウザのスマホ相当表示であり、物理端末のFPS・スピーカー・振動計測ではない。
 - 参考画像と作業資料はinput/、スクリーンショットと撮影スクリプトはscreenshots/のignoredローカル資料。いずれもcommit/pushしない。
 
-公開後の配信確認を追記する。
+### 公開確認
+
+- ゲーム公開ソース `69f43a91fac0affe49d298c31f0ce00114070282` をmainへpush。
+- Actions `https://github.com/tomot084/tomori-frontier/actions/runs/37299445693` はbuild/deployともsuccess。GitHub側でも単体・ブラウザ全件・build・監査を実行。
+- 公開URL：`https://tomot084.github.io/tomori-frontier/`。クエリなしのトップページも新しい `assets/index-CcRvPZgx.js` を参照。
+- 配信JSのSHA-256は最終ローカルbuildと一致：`2e689ba7734f101277b51712db448a4efe2f6674a8f10a4802044e4d5e70c078`。
+- 公開版を390×844・412×915・1280×720で再撮影し、390では実採集・運搬・橋の完成・精霊の運搬まで操作。後半2島も既存形式のセーブを復元して表示確認。すべてconsole error 0・assetエラー0、3画面サイズの外部オリジン通信0。
+- 最終公開画像：`screenshots/finish-published-{390,412,1280}.png`、`finish-published-carry-390.png`、`finish-published-unlock-390.png`、`finish-published-crew-390.png`、`finish-published-zone{1,2}-390.png`。スマホの開始・運搬・後半の画像を実際に開いて最終比較。
+- `input/reference-images`、原本素材、作業画像・スクリーンショットは未追跡。公開不要素材はdistにも含まない。
+
 
 ---
 
