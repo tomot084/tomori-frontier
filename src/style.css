@@ -1,0 +1,218 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  background: #102f36;
+  font-family: system-ui, sans-serif;
+  color: #f3f7de;
+}
+#game {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  width: 100vw;
+  height: 100dvh;
+}
+canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: #28555a;
+  border: 1px solid #91bfa1;
+  border-radius: 12px;
+  min-height: 44px;
+  padding: 10px 16px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:active {
+  transform: scale(0.96);
+}
+#hud {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: 12px;
+  right: 62px;
+  pointer-events: none;
+  max-width: 470px;
+}
+#resources {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  background: #102f36e8;
+  padding: 9px 10px;
+  border: 1px solid #658f79;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.health {
+  height: 7px;
+  background: #122a30;
+  border-radius: 8px;
+  margin: 7px 4px;
+  overflow: hidden;
+}
+.health i {
+  display: block;
+  height: 100%;
+  background: #f39582;
+  width: 100%;
+  transition: width 0.2s;
+}
+#goal {
+  white-space: pre-line;
+  font-size: 13px;
+  background: #102f36c9;
+  padding: 7px 10px;
+  border-radius: 10px;
+  line-height: 1.5;
+}
+#settings {
+  position: fixed;
+  right: 10px;
+  top: calc(env(safe-area-inset-top) + 12px);
+  padding: 8px;
+  width: 44px;
+}
+#toast {
+  position: fixed;
+  top: 29%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #173e43e8;
+  border-radius: 14px;
+  padding: 12px 18px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+  max-width: 90%;
+  width: max-content;
+  font-size: 14px;
+}
+#shop {
+  position: fixed;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  width: 205px;
+  padding: 12px;
+  background: #143c40f2;
+  border: 1px solid #90bc9d;
+  border-radius: 18px;
+}
+#shop h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+#shop button {
+  display: block;
+  width: 100%;
+  font-size: 12px;
+  min-height: 44px;
+  margin-top: 5px;
+  padding: 7px;
+}
+#shop button:disabled {
+  opacity: 0.55;
+}
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: #0c2835c9;
+  backdrop-filter: blur(6px);
+  padding: 20px;
+}
+.overlay section {
+  text-align: center;
+  max-width: 400px;
+  padding: 32px 24px;
+  border: 1px solid #84b09d;
+  border-radius: 28px;
+  background: linear-gradient(#214a4e, #102f36);
+  box-shadow: 0 30px 80px #001b28;
+}
+.overlay h1 {
+  font-size: 32px;
+  letter-spacing: 0.08em;
+  margin: 14px 0;
+}
+.overlay p {
+  line-height: 1.9;
+  font-size: 14px;
+  color: #d1e2cf;
+}
+.overlay small {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  line-height: 1.9;
+  color: #a5c9b9;
+}
+.overlay button {
+  width: 100%;
+  background: #d6bd6d;
+  color: #163238;
+  font-weight: bold;
+  margin: 12px 0 18px;
+}
+.illustration {
+  font-size: 44px;
+  margin: 22px;
+}
+dialog {
+  background: #163e43;
+  color: #edf5dc;
+  border: 1px solid #88b59c;
+  border-radius: 20px;
+  max-width: 90%;
+  padding: 24px;
+}
+dialog::backdrop {
+  background: #001b28b8;
+}
+dialog button {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+}
+@media (max-height: 550px) {
+  #shop {
+    width: 320px;
+    bottom: 10px;
+  }
+  #shop button {
+    display: inline-block;
+    width: 48%;
+    margin: 2px;
+  }
+  #goal {
+    font-size: 12px;
+  }
+  .overlay section {
+    padding: 12px;
+  }
+  .illustration {
+    display: none;
+  }
+  .overlay h1 {
+    margin: 5px;
+  }
+  .overlay p {
+    margin: 8px;
+  }
+}

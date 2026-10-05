@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"
+    />
+    <meta name="theme-color" content="#102f36" />
+    <title>灯芽の開拓者</title>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="hud">
+      <div id="resources"></div>
+      <div class="health"><i id="hp"></i></div>
+      <div id="goal"></div>
+    </div>
+    <button id="settings" aria-label="設定">⚙</button>
+    <div id="toast"></div>
+    <div id="shop" hidden></div>
+    <div id="intro" class="overlay">
+      <section>
+        <small>TOMORI FRONTIER</small>
+        <h1>灯芽の開拓者</h1>
+        <p>霧に眠る三つの浮島。<br />小さな灯守と、もう一度光をつなごう。</p>
+        <div class="illustration">✦ 🌱 ✦</div>
+        <p>移動だけで、採集も戦闘も自動。<br />集めた素材で道をひらこう。</p>
+        <button id="start" disabled>島へ降りる</button
+        ><small
+          >スマホ：左下をドラッグ<br />PC：WASD / 矢印キー · 自動セーブ</small
+        >
+      </section>
+    </div>
+    <dialog id="config">
+      <h2>旅の設定</h2>
+      <p>進行はこのブラウザに自動保存されます。</p>
+      <button id="reset">セーブデータをリセット</button
+      ><button id="close">戻る</button>
+    </dialog>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
