@@ -50,7 +50,11 @@ v1と既存KEYを維持し、追加の `economy` に雇用人数・配達係・�
 - 改善前画像：`invest-before-390.png` / `invest-before-1280.png`。全スクリーンショットはローカル保存のみ。
 - 公開JS：`assets/index-brke6lD6.js`、SHA-256 `29e1bf39c6f628ef494ea4135deb58aaacbe9a8d9d0923c866c7767206e5ee8c`。
 
-公開後のActions/Pages確認結果は追記する。
+- 公開ソースcommit：`4b00d8bb19d78c46ae39367e12eddfcb83f1e2be` をmainへpush。
+- [Actions 37327764902](https://github.com/tomot084/tomori-frontier/actions/runs/37327764902)：build 7m1s、deploy 20sともsuccess。最終ソースの単体テスト19件、ブラウザテスト11件すべて成功。production build・dist監査142件成功。
+- 公開ルートURLのHTMLが `index-brke6lD6.js` を参照し、配信されたJSの全バイトとSHA-256がローカル最終distと一致。
+- 公開版を新しいブラウザで起動し、390/412/1280/844の表示と投資一覧を再撮影。木20個を採集し、手売り→配達係雇用→木10個預け入れ→配達完了（累計木20個販売・所持10灯貨）まで実行。`invest-published-{390,412,1280,844}.png`、`invest-published-choices-*`、`invest-published-{sell,delivery,paid}-390.png` を保存して画像として確認。全4サイズでconsole/page error 0、HTTP/asset 404 0、外部origin 0、横方向のはみ出し0。
+- READMEを現行の操作・投資・保存互換・承認済みCC0素材の説明へ更新。公開確認記録とREADMEのみを後続の `[skip ci]` commitで記録し、ゲーム配信物は変更しない。
 
 ## 完成度改善：島が働き始める開拓ループ（2026-10-05）
 
