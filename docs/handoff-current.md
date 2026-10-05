@@ -29,7 +29,14 @@
 - 最終スマホ・PCの実ブラウザ画像：`screenshots/rethink-final-{390,412,1280}.png`。運搬・投入：`rethink-carry-390.png` / `rethink-deliver-390.png`。全3サイズの追加キャプチャでconsole error 0、HTTP 404を含むassetエラー0。
 - production build成功。dist監査142ファイル合格。参考画像・作業画像・元素材・スクリーンショットはdistにもGitにも含めない。
 
-公開状態は配信確認後に追記する。
+### 公開確認
+
+- 公開ソース commit `66bc7ed6f6ed3ac683efb2748aa9f4f94088109b` をmainへpush。
+- Actions `https://github.com/tomot084/tomori-frontier/actions/runs/37294090011` のbuild/deployがともに成功。
+- GitHub Pages `https://tomot084.github.io/tomori-frontier/` を390×844・412×915・1280×720で再確認。全サイズでconsole error 0・asset HTTPエラー0。390では実採集・運搬・投入の画面も再取得。上記 `rethink-final-*` / `rethink-carry-390.png` / `rethink-deliver-390.png` は公開版の最終画像。
+- 配信された `assets/index-BvFxH413.js` のSHA-256はローカルbuildと一致：`416138bee537a8f8624cc73c23be1d5df71d53704d49077ce81965c214abf7e1`。
+- 参考画像・作業素材・スクリーンショットのcommit/pushなし。
+
 
 ---
 
