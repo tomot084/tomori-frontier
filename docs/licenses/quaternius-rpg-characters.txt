@@ -1,0 +1,19 @@
+------------------------------------------------------
+LowPoly Models by @Quaternius
+Consider supporting me on Patreon, even $1 helps me a lot!
+
+https://www.patreon.com/quaternius
+-------------------------------------------------------
+
+License:
+CC0 1.0 Universal (CC0 1.0) 
+Public Domain Dedication
+https://creativecommons.org/publicdomain/zero/1.0/
+
+
+Pack source: https://quaternius.com/packs/rpgcharacters.html
+Original bundled license file:
+https://drive.google.com/file/d/1dc19T9_fxiy7jscseYp0lP2IhRi-e2b6/view
+Retrieved with Ranger.gltf from the author's linked RPG Characters folder,
+2026-10-05. This is the original pack-specific CC0 license, not the newer
+Quaternius Asset License shown on the site's general license page.

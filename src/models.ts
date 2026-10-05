@@ -1,4 +1,5 @@
-/** Original low-poly mesh art. Shared vertex-colour materials; no external assets. */
+import natureMeshes from "./assets/nature-meshes.json";
+/** Tomori props and adapted CC0 Kenney vegetation. See docs/asset-sources.md. */
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -192,73 +193,42 @@ export class Art {
     return this.merge(name, [body, ...ends, ring, core]);
   }
   tree(seed: number) {
-    const parts: Mesh[] = [];
-    parts.push(
-      this.cylinder("root", 0, 0.22, 0, 0.22, 0.37, 0.44, 0x8a5c3d, 7),
-    );
-    const trunk = this.cylinder(
-      "trunk",
-      0.02,
-      0.98,
-      0,
-      0.105,
+    const names = [
+      "tree_oak",
+      "tree_pineRoundD",
+      "tree_pineTallA_detailed",
+    ] as const;
+    const name = names[Math.abs(Math.floor(seed * 0.17)) % names.length];
+    const source = natureMeshes[name];
+    const mesh = new Mesh("lantern-grove-" + name, this.scene);
+    const data = new VertexData();
+    data.positions = source.positions;
+    data.normals = source.normals;
+    data.uvs = new Array((source.positions.length / 3) * 2).fill(0);
+    data.colors = source.colors;
+    data.indices = source.indices;
+    data.applyToMesh(mesh);
+    mesh.material = this.material;
+    mesh.isPickable = false;
+    mesh.receiveShadows = true;
+    mesh.rotation.y = noise(seed) * Math.PI * 2;
+    const scale = 0.88 + noise(seed + 9) * 0.2;
+    mesh.scaling.set(scale, scale, scale);
+    // Gold lantern fruit ties the imported vegetation to Tomori's original islands.
+    const fruit = this.sphere(
+      "lantern-fruit",
+      0.19,
+      1.1,
+      0.27,
+      0.15,
       0.2,
-      1.66,
-      palette.wood,
-      7,
+      0.15,
+      palette.gold,
+      true,
     );
-    trunk.rotation.z = 0.055;
-    parts.push(trunk);
-    for (const side of [-1, 1]) {
-      const branch = this.cylinder(
-        "branch",
-        side * 0.23,
-        1.45,
-        0.03,
-        0.045,
-        0.09,
-        0.72,
-        0xb58050,
-        6,
-      );
-      branch.rotation.z = side * -0.65;
-      parts.push(branch);
-    }
-    // Rounded, layered crowns with a readable silhouette and golden lantern fruit.
-    const hues = [0x297e68, 0x459c72, 0x7aba6c, 0xa6d779];
-    for (let i = 0; i < 5; i++) {
-      const angle = i * 2.399 + seed * 0.13;
-      const upper = i > 2;
-      parts.push(
-        this.sphere(
-          "leaf-cushion",
-          Math.cos(angle) * (upper ? 0.25 : 0.48),
-          upper ? 2.5 + (i - 3) * 0.22 : 1.95 + (i % 2) * 0.16,
-          Math.sin(angle) * (upper ? 0.25 : 0.4),
-          upper ? 1.65 : 1.95,
-          upper ? 1.05 : 1.2,
-          1.45,
-          hues[upper ? 2 + (i % 2) : i % 2],
-        ),
-      );
-    }
-    for (let i = 0; i < 4; i++) {
-      const angle = i * 1.9;
-      parts.push(
-        this.sphere(
-          "lamp-seed",
-          Math.cos(angle) * 0.88,
-          1.9 + (i % 2) * 0.35,
-          Math.sin(angle) * 0.85,
-          0.18,
-          0.25,
-          0.18,
-          0xffdc79,
-        ),
-      );
-    }
-    return this.merge("broadleaf-lantern-tree", parts);
+    return this.merge("lantern-tree", [mesh, fruit]);
   }
+
   boulder(seed: number) {
     const a = this.rock("boulder", 1.65, palette.stone, seed);
     const b = this.rock("cracked-face", 0.72, palette.stoneLight, seed + 2);

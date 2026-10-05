@@ -1,3 +1,4 @@
+import { Keeper } from "./keeper";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { FreeCamera } from "@babylonjs/core/Cameras/freeCamera";
@@ -38,6 +39,12 @@ interface Fragment {
   life: number;
 }
 export class WorldView {
+  keeper = new Keeper();
+  async loadAssets() {
+    await this.keeper.load(this.art, this.rig);
+    this.actors.get("player")!.mesh = this.rig.body;
+    this.scene.render();
+  }
   engine: Engine;
   scene: Scene;
   camera: FreeCamera;
@@ -643,6 +650,7 @@ export class WorldView {
       this.rig.torso.rotation.x = 0;
       this.ring.setEnabled(false);
     }
+    this.keeper.pose(this.time, m.moving, phase, this.swing.kind);
     for (const [kind, mesh] of Object.entries(this.rig.tools))
       mesh.setEnabled(
         (phase >= 0 &&
@@ -876,6 +884,7 @@ export class WorldView {
   metrics() {
     return {
       renderer: "Babylon.js WebGL",
+      keeper: this.keeper.metrics(),
       fps: Math.round(this.engine.getFps()),
       internalSize: [
         this.engine.getRenderWidth(),

@@ -20,7 +20,14 @@ if (!Engine.IsSupported) {
 } else {
   try {
     view = new WorldView(canvas, model, el("world-ui"));
-    boot();
+    view
+      .loadAssets()
+      .then(boot)
+      .catch((error) => {
+        el("loading").textContent =
+          "島の素材を読み込めませんでした。更新してお試しください。";
+        throw error;
+      });
   } catch (e) {
     el("loading").textContent =
       "島を読み込めませんでした。ブラウザを更新してお試しください。";
