@@ -34,7 +34,7 @@ export class Art {
   material: StandardMaterial;
   constructor(public scene: Scene) {
     this.material = new StandardMaterial("painted-low-poly", scene);
-    this.material.diffuseColor = new Color3(0.86, 0.86, 0.86);
+    this.material.diffuseColor = new Color3(1, 1, 1);
     this.material.specularColor = new Color3(0.035, 0.035, 0.035);
   }
   tint(mesh: Mesh, hex: number, facets = false) {
@@ -87,9 +87,9 @@ export class Art {
           { radius: 0.5, subdivisions: 1, flat: true },
           this.scene,
         )
-      : MeshBuilder.CreateSphere(
+      : MeshBuilder.CreateIcoSphere(
           name,
-          { diameter: 1, segments: 8 },
+          { radius: 0.5, subdivisions: 2, flat: false },
           this.scene,
         );
     m.position.set(x, y, z);
@@ -224,37 +224,44 @@ export class Art {
       branch.rotation.z = side * -0.65;
       parts.push(branch);
     }
-    const hues = [0x568f64, 0x79b16b, 0xa0c878];
-    for (let i = 0; i < 3; i++) {
-      const m = this.rock("faceted-crown", 1, hues[i], seed + i);
-      m.scaling.set(i === 2 ? 1.45 : 1.65, i === 2 ? 1.22 : 1.13, 1.48);
-      m.position.set(
-        i === 0 ? -0.4 : i === 1 ? 0.4 : 0.06,
-        i === 2 ? 2.02 : 1.38,
-        i === 0 ? 0.05 : i === 1 ? 0.1 : -0.08,
+    // Rounded, layered crowns with a readable silhouette and golden lantern fruit.
+    const hues = [0x39866c, 0x52a577, 0x84c879, 0xb2dd88];
+    for (let i = 0; i < 7; i++) {
+      const angle = i * 2.399 + seed * 0.13;
+      const upper = i > 3;
+      parts.push(
+        this.sphere(
+          "leaf-cushion",
+          Math.cos(angle) * (upper ? 0.38 : 0.62),
+          upper ? 2.45 + (i - 4) * 0.17 : 1.92 + (i % 2) * 0.17,
+          Math.sin(angle) * (upper ? 0.32 : 0.5),
+          upper ? 1.42 : 1.65,
+          upper ? 1.22 : 1.34,
+          1.45,
+          hues[upper ? 2 + (i % 2) : i % 2],
+        ),
       );
-      m.rotation.y = seed * 0.6 + i;
-      parts.push(m);
     }
-    for (let i = 0; i < 3; i++)
+    for (let i = 0; i < 4; i++) {
+      const angle = i * 1.9;
       parts.push(
         this.sphere(
           "lamp-seed",
-          (i - 1) * 0.45,
-          1.82 + i * 0.12,
-          -0.48,
-          0.09,
-          0.12,
-          0.09,
-          0xf5d179,
-          true,
+          Math.cos(angle) * 0.88,
+          1.9 + (i % 2) * 0.35,
+          Math.sin(angle) * 0.85,
+          0.18,
+          0.25,
+          0.18,
+          0xffdc79,
         ),
       );
+    }
     return this.merge("broadleaf-lantern-tree", parts);
   }
   boulder(seed: number) {
-    const a = this.rock("boulder", 1.15, palette.stone, seed);
-    const b = this.rock("cracked-face", 0.52, palette.stoneLight, seed + 2);
+    const a = this.rock("boulder", 1.65, palette.stone, seed);
+    const b = this.rock("cracked-face", 0.72, palette.stoneLight, seed + 2);
     b.position.set(-0.32, 0.13, -0.26);
     const vein = this.box(
       "mineral-vein",
@@ -825,6 +832,7 @@ export class Art {
         );
       }
       const m = this.merge("tool-" + kind, ps);
+      m.scaling.setAll(1.5);
       m.parent = toolPivot;
       m.setEnabled(false);
       tools[kind] = m;
@@ -836,11 +844,7 @@ export class Art {
         const m = this.log("carried-log-" + i);
         m.scaling.x = 1.28;
         m.parent = cargoRoot;
-        m.position.set(
-          ((i % 2) - 0.5) * 0.15,
-          Math.floor(i / 2) * 0.28,
-          0.03 + (i % 2) * 0.25,
-        );
+        m.position.set(((i % 2) - 0.5) * 0.15, i * 0.27, 0.1);
         m.setEnabled(false);
         return m;
       }),

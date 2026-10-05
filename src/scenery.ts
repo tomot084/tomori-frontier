@@ -39,7 +39,7 @@ function island(art: Art, zone: number, start: number, end: number) {
     const co = color(hex);
     for (let i = 0; i < 3; i++) colors.push(co.r, co.g, co.b, 1);
   }
-  const grass = [0x9bbf79, 0x85b47b, 0x83ac91][zone],
+  const grass = [0x93bd79, 0x82b894, 0x8aafa1][zone],
     center = worldPoint(450, (start + end) / 2, 0.02);
   for (let i = 0; i < outline.length; i++) {
     const j = (i + 1) % outline.length;
@@ -97,7 +97,7 @@ export interface BuiltSite {
 export function makeScenery(art: Art) {
   const zones: Mesh[][] = [[], [], []],
     shadowCasters: Mesh[] = [];
-  const water = art.box("quiet-tide", 0, -1.65, -18, 110, 0.1, 120, 0x74aeb5);
+  const water = art.box("quiet-tide", 0, -1.65, -18, 110, 0.1, 120, 0x65aeb7);
   water.receiveShadows = false;
   const ranges = [
     [170, 692],
@@ -107,24 +107,58 @@ export function makeScenery(art: Art) {
   ranges.forEach(([start, end], zone) => {
     zones[zone].push(island(art, zone, start, end));
     const details: Mesh[] = [];
-    // A worn footpath curves slightly and varies in width rather than using a grid.
-    for (let j = 0; j < Math.floor((end - start) / 34); j++) {
-      const y = start + 20 + j * 34,
-        x = 450 + Math.sin(j * 0.7 + zone) * 13;
-      const m = art.cylinder(
-        "path-patch",
-        0,
-        0,
-        0,
-        0.6 + rand(j) * 0.23,
-        0.6 + rand(j) * 0.23,
-        0.008,
-        0xc6bd8b,
-        10,
+    // Low, irregular meadow colour patches break up the broad ground plane.
+    for (let i = 0; i < 28; i++) {
+      const patch = MeshBuilder.CreateDisc(
+        "meadow-colour",
+        {
+          radius: 0.8 + rand(i) * 0.9,
+          tessellation: 18,
+          sideOrientation: Mesh.DOUBLESIDE,
+        },
+        art.scene,
       );
-      m.scaling.z = 1.35;
-      m.position.copyFrom(worldPoint(x, y, 0.028));
-      details.push(m);
+      patch.rotation.x = Math.PI / 2;
+      art.tint(patch, i % 2 ? 0x92ba7b : 0x9bc382);
+      patch.position.copyFrom(
+        worldPoint(
+          115 + rand(i + 8) * 660,
+          start + 35 + rand(i + 30) * (end - start - 70),
+          0.023,
+        ),
+      );
+      patch.scaling.z = 0.65;
+      details.push(patch);
+    }
+    // Continuous curved ribbon, avoiding overlapping triangulated path discs.
+    const pathEdges = [-1, 1].map((side) =>
+      Array.from({ length: 32 }, (_, j) => {
+        const y = start + (j * (end - start)) / 31;
+        return worldPoint(
+          450 +
+            Math.sin(j * 0.18 + zone) * 17 +
+            side * (35 + Math.sin(j * 0.5) * 4),
+          y,
+          0.036,
+        );
+      }),
+    );
+    const path = MeshBuilder.CreateRibbon(
+      "worn-earth-path",
+      { pathArray: pathEdges, sideOrientation: Mesh.DOUBLESIDE },
+      art.scene,
+    );
+    art.tint(path, 0xd7bb83);
+    details.push(path);
+    // Understory clusters and border trees create a forest, while keeping the main route readable.
+    for (let i = 0; i < 20; i++) {
+      const side = i % 2;
+      const x = side ? 775 + rand(i) * 32 : 95 + rand(i) * 40;
+      const y = start + 40 + (Math.floor(i / 2) * (end - start - 80)) / 10;
+      const tree = art.tree(i + zone * 47);
+      tree.scaling.setAll(0.7 + rand(i + 4) * 0.25);
+      tree.position.copyFrom(worldPoint(x, y));
+      details.push(tree);
     }
     for (let i = 0; i < 100; i++) {
       const x = 95 + rand(i + zone * 200) * 710,
@@ -465,6 +499,34 @@ export function makeScenery(art: Art) {
       crate,
       art.box("crate-band", -1.73, 0.26, 0.16, 0.55, 0.06, 0.025, 0xf2d89d),
     );
+    for (const side of [-1, 1]) {
+      for (let j = 0; j < 6; j++) {
+        baseParts.push(
+          art.box(
+            "site-inlay-dash",
+            side * 1.44,
+            0.05,
+            -1 + j * 0.4,
+            0.06,
+            0.018,
+            0.24,
+            0xffedb8,
+          ),
+        );
+        baseParts.push(
+          art.box(
+            "site-inlay-dash",
+            -1.2 + j * 0.48,
+            0.05,
+            side * 1.2,
+            0.28,
+            0.018,
+            0.06,
+            0xffedb8,
+          ),
+        );
+      }
+    }
     const base = art.merge("foundation-" + i, baseParts);
     base.parent = root;
     marker = MeshBuilder.CreateTorus(

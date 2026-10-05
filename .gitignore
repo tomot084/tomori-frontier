@@ -5,3 +5,6 @@ dist/
 screenshots/
 test-results/
 playwright-report/
+
+# Local visual references; never publish.
+input/

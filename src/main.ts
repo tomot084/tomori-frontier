@@ -130,7 +130,7 @@ function boot() {
   let slowFrames = 0;
   view.engine.runRenderLoop(() => {
     const now = performance.now(),
-      delta = Math.min(60, now - last);
+      delta = Math.min(240, now - last);
     last = now;
     const paused =
       !started || (el("config") as HTMLDialogElement).open || document.hidden;
@@ -139,10 +139,13 @@ function boot() {
       const dir = ui.shopOpen
         ? { x: 0, y: 0 }
         : view.screenInput(movement.screenVector());
-      model.step(delta, {
+      const input = {
         x: dir.x + (ui.shopOpen ? 0 : debugInput.x),
         y: dir.y + (ui.shopOpen ? 0 : debugInput.y),
-      });
+      };
+      // Keep real-time gathering on slower renderers, with bounded movement steps.
+      for (let remaining = delta; remaining > 0; remaining -= 60)
+        model.step(Math.min(remaining, 60), input);
     }
     for (const event of model.events.splice(0)) {
       if (event.type === "toast") ui.toast(event.text!);

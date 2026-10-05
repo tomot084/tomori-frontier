@@ -749,3 +749,35 @@ dialog #close {
     font-size: 10px;
   }
 }
+
+/* Compact field HUD leaves the play space and silhouettes in focus. */
+.resource-chip {
+  border-radius: 13px;
+  padding: 7px 7px 5px;
+  box-shadow: 0 3px 0 #335c5830;
+}
+.objective {
+  padding: 6px 12px;
+  max-width: 300px;
+}
+.site-label {
+  min-width: 132px;
+  padding: 6px 9px;
+  border-radius: 11px;
+  background: #fff6e4f2;
+}
+.site-label b {
+  font-size: 12px;
+}
+.site-label span {
+  font-size: 10px;
+}
+.enemy-health {
+  width: 43px;
+  height: 7px;
+  border: 1px solid #fff3cf;
+  box-shadow: 0 2px 2px #233e4a55;
+}
+.enemy-health i {
+  background: linear-gradient(#ff9a78, #e86256);
+}

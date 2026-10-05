@@ -134,7 +134,11 @@ export class GameModel {
     });
   }
   burst(at: Point, color: number, count = 6) {
-    this.event("burst", at, { color, count });
+    this.event("burst", at, {
+      color,
+      count,
+      kind: (at as Partial<Gatherable>).kind,
+    });
   }
   get atCamp() {
     return camps.some(

@@ -58,7 +58,7 @@ export class WorldView {
   width = 390;
   height = 844;
   target = Vector3.Zero();
-  cameraOffset = new Vector3(9, 22, -20);
+  cameraOffset = new Vector3(10, 19, -22);
   shakeUntil = 0;
   swing = { at: -100, kind: "wood", yaw: Math.PI };
   trail: Mesh;
@@ -98,7 +98,7 @@ export class WorldView {
       new Vector3(-0.2, 1, 0.1),
       this.scene,
     );
-    sky.intensity = 0.78;
+    sky.intensity = 0.68;
     sky.diffuse = new Color3(0.94, 1, 0.96);
     sky.groundColor = new Color3(0.38, 0.52, 0.5);
     sky.specular = Color3.Black();
@@ -107,7 +107,7 @@ export class WorldView {
       new Vector3(0.35, -1, 0.4),
       this.scene,
     );
-    this.sun.intensity = 1.05;
+    this.sun.intensity = 0.85;
     this.sun.diffuse = new Color3(1, 0.94, 0.79);
     this.sun.specular = Color3.Black();
     this.sun.shadowMinZ = 1;
@@ -117,15 +117,15 @@ export class WorldView {
     this.shadows.useBlurExponentialShadowMap = true;
     this.shadows.blurKernel = 12;
     this.shadows.blurScale = 2;
-    this.shadows.depthScale = 50;
+    this.shadows.depthScale = 20;
     this.shadows.bias = 0.001;
     this.shadows.normalBias = 0.025;
-    this.shadows.setDarkness(0.32);
+    this.shadows.setDarkness(0.24);
     this.art = new Art(this.scene);
     this.shadowMaterial = this.makeShadowMaterial();
     this.scenery = makeScenery(this.art);
     this.rig = this.art.player();
-    this.rig.root.scaling.setAll(1.18);
+    this.rig.root.scaling.setAll(1.25);
     this.rig.root.rotation.y = Math.PI;
     for (const n of model.nodes) {
       const root = new TransformNode(n.id, this.scene);
@@ -137,7 +137,7 @@ export class WorldView {
             ? this.art.boulder(n.x)
             : this.art.berry();
       mesh.parent = root;
-      const shadow = this.shadow(n.kind === "wood" ? 1.9 : 1.3);
+      const shadow = this.shadow(n.kind === "wood" ? 2.8 : 1.6);
       shadow.position.copyFrom(root.position);
       shadow.position.y = 0.034;
       this.actors.set(n.id, {
@@ -199,7 +199,7 @@ export class WorldView {
     );
     this.art.tint(this.ring, 0xffe4a4);
     this.ring.setEnabled(false);
-    const paths = [0.93, 1.22].map((r) =>
+    const paths = [1.1, 2.25].map((r) =>
       Array.from({ length: 15 }, (_, i) => {
         const a = -1.15 + (i * 2.3) / 14;
         return new Vector3(Math.sin(a) * r, 0.9, Math.cos(a) * r);
@@ -257,7 +257,7 @@ export class WorldView {
     m.useAlphaFromDiffuseTexture = true;
     m.diffuseColor = new Color3(0.13, 0.26, 0.23);
     m.disableLighting = true;
-    m.alpha = 0.45;
+    m.alpha = 0.65;
     m.disableDepthWrite = true;
     return m;
   }
@@ -276,7 +276,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 10.5 : 8;
+    const halfHeight = ratio < 0.8 ? 9 : 8;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -342,7 +342,33 @@ export class WorldView {
     if (event.type === "hit") {
       const a = this.actors.get(event.id || "");
       if (a) a.hitAt = this.time + 0.1;
-      if (event.id === "player") this.shakeUntil = this.time + 0.14;
+      if (event.id === "player" || event.kind === "enemy")
+        this.shakeUntil = this.time + 0.14;
+      if (event.id !== "player" && this.particles.length < 48) {
+        const flash = this.art.sphere(
+          "impact-star",
+          0,
+          0,
+          0,
+          0.7,
+          0.7,
+          0.16,
+          0xffedaa,
+          true,
+        );
+        flash.position.copyFrom(
+          worldPoint(event.x, event.y, event.kind === "wood" ? 1.5 : 0.8),
+        );
+        flash.material = this.trail.material;
+        const origin = flash.position.clone();
+        this.particles.push({
+          mesh: flash,
+          origin,
+          born: this.time + 0.1,
+          velocity: Vector3.Zero(),
+          life: 0.18,
+        });
+      }
     }
     if (event.type === "death") {
       const a = this.actors.get(event.id || "");
@@ -397,25 +423,29 @@ export class WorldView {
   burst(e: GameEvent) {
     const count = Math.min(e.count || 6, 48 - this.particles.length);
     for (let i = 0; i < count; i++) {
-      const mesh = this.art.rock(
-        "impact-fragment",
-        0.07 + Math.random() * 0.07,
-        e.color || palette.gold,
-        i,
-      );
-      const origin = worldPoint(e.x, e.y, 0.9);
+      const mesh =
+        e.kind === "wood"
+          ? this.art.log("flying-wood-chip")
+          : this.art.rock(
+              "impact-fragment",
+              0.07 + Math.random() * 0.07,
+              e.color || palette.gold,
+              i,
+            );
+      if (e.kind === "wood") mesh.scaling.setAll(0.55);
+      const origin = worldPoint(e.x, e.y, 1.2);
       mesh.position.copyFrom(origin);
       mesh.setEnabled(false);
       this.particles.push({
         mesh,
         origin,
         velocity: new Vector3(
-          (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 5,
           1.5 + Math.random() * 2,
-          (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 5,
         ),
         born: this.time + 0.1,
-        life: 0.48,
+        life: 0.65,
       });
     }
   }
@@ -444,7 +474,7 @@ export class WorldView {
     this.rig.wood.forEach((m, i) => m.setEnabled(i < wood));
     this.rig.stone.forEach((m, i) => {
       m.setEnabled(i < stone);
-      m.position.y = Math.ceil(wood / 2) * 0.28 + Math.floor(i / 2) * 0.29;
+      m.position.y = wood * 0.32 + Math.floor(i / 2) * 0.29;
     });
     this.rig.food.setEnabled(s.resources.food > 0);
   }
@@ -470,7 +500,7 @@ export class WorldView {
     });
   }
   update(delta: number) {
-    const dt = Math.min(delta, 60) / 1000;
+    const dt = Math.min(delta, 240) / 1000;
     this.time += dt;
     const m = this.model;
     this.syncCargo();
@@ -582,7 +612,7 @@ export class WorldView {
           ? 0.15 + Math.sin(this.time * 7) * 0.11
           : Math.abs(Math.sin(this.time * 7 + e.x)) * 0.04;
       a.root.rotation.y = Math.atan2(m.player.x - e.x, -(m.player.y - e.y));
-      a.root.scaling.setAll(dying ? Math.max(0.01, 1 - age / 0.26) : 1);
+      a.root.scaling.setAll(dying ? Math.max(0.01, 1 - age / 0.26) : 1.22);
       a.shadow.position.copyFrom(a.root.position);
       a.shadow.position.y = 0.035;
       a.mesh.renderOverlay = this.time > a.hitAt && this.time < a.hitAt + 0.14;
@@ -606,7 +636,7 @@ export class WorldView {
         const underCanopy =
           mesh.name === "lantern-workshop" &&
           Vector3.DistanceSquared(mesh.position, p.root.position) < 1.9;
-        mesh.visibility = i <= m.s.zone ? (underCanopy ? 0.3 : 1) : 0.36;
+        mesh.visibility = i <= m.s.zone ? (underCanopy ? 0.3 : 1) : 1;
       }
     });
     casters.push(
@@ -662,7 +692,10 @@ export class WorldView {
       else {
         f.mesh.position.y -= 5 * age * age;
         f.mesh.rotation.set(age * 3, age * 4, 0);
-        f.mesh.scaling.setAll(1 - (age / f.life) * 0.6);
+        f.mesh.scaling.setAll(
+          (f.mesh.name === "flying-wood-chip" ? 0.55 : 1) *
+            (1 - (age / f.life) * 0.6),
+        );
       }
     }
     for (let i = this.floats.length - 1; i >= 0; i--) {
@@ -687,7 +720,9 @@ export class WorldView {
       this.place(
         label,
         worldPoint(450, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1),
-        i <= m.s.zone && (m.s.zone <= i || i === 2),
+        i <= m.s.zone &&
+          (m.s.zone <= i || i === 2) &&
+          Math.abs(m.player.y - buildingData[i].y) < 340,
       );
     });
     const campPts = [
