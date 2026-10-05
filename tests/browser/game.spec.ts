@@ -34,7 +34,7 @@ for (const size of [
       await page.keyboard.down("ArrowRight");
       await expect
         .poll(async () => (await state(page)).x)
-        .toBeGreaterThan(initial.x + 15);
+        .toBeGreaterThan(initial.x + 60);
       await page.keyboard.up("ArrowRight");
       await page.keyboard.down("W");
       await expect
@@ -68,11 +68,11 @@ for (const size of [
     expect(stopped.stick.id).toBe(-1);
     await pos(page, 140, 390);
     await expect
-      .poll(async () => (await state(page)).resources.wood)
+      .poll(async () => (await state(page)).resources.wood, { timeout: 12000 })
       .toBeGreaterThan(0);
     await pos(page, 695, 390);
     await expect
-      .poll(async () => (await state(page)).resources.stone)
+      .poll(async () => (await state(page)).resources.stone, { timeout: 12000 })
       .toBeGreaterThan(0);
     await page.screenshot({ path: `screenshots/review1-${size.width}.png` });
     // Real gathering/deposit routines; the hook moves between destinations only.

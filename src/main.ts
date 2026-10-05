@@ -161,9 +161,9 @@ function boot() {
       ui.update(started);
     }
     view.update(delta);
-    if (started && now > 4000 && view.engine.getFps() < 28) slowFrames++;
-    else slowFrames = Math.max(0, slowFrames - 1);
-    if (slowFrames > 90 && view.quality !== "low") {
+    if (started && now > 4000 && view.engine.getFps() < 28) slowFrames += delta;
+    else slowFrames = Math.max(0, slowFrames - delta);
+    if (slowFrames > 2000 && view.quality !== "low") {
       view.quality = "low";
       view.engine.setHardwareScalingLevel(1.35);
       view.shadows.getShadowMap()!.refreshRate = 2;
