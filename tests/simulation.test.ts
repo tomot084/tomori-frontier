@@ -136,7 +136,7 @@ it("guides the first handful to construction, then funds a visibly stronger tool
   expect(load(old)).toEqual(m.snapshot());
 });
 
-it("construction unlocks real helper harvesting and delivery without spending player inventory", () => {
+it("optional hired carrier delivers without spending player inventory", () => {
   const s = fresh();
   const m = new GameModel(s);
   run(m, 10000);
@@ -146,6 +146,9 @@ it("construction unlocks real helper harvesting and delivery without spending pl
   m.player = { x: 450, y: 682 };
   run(m, 5000);
   expect(s.zone).toBe(1);
+  run(m, 1000);
+  expect(m.crew.workers.some((w) => w.active)).toBe(false);
+  expect(m.investments.buy("carrier")).toBe(true);
   m.player = { x: 690, y: 940 };
   const inventory = { ...s.resources };
   run(m, 35000);
@@ -160,13 +163,14 @@ it("construction unlocks real helper harvesting and delivery without spending pl
   expect(s.zone).toBe(1); // Food must still be gathered and delivered by the player.
 });
 
-it("helpers can finish a funded gate, unlock a second helper and resume from existing saves", () => {
+it("hired helpers finish a funded gate and retain purchased crew after reload", () => {
   const s = fresh();
   s.zone = 1;
   s.progress[0] = { wood: 20, stone: 10, food: 0 };
   s.progress[1] = { wood: 55, stone: 40, food: 8 };
   s.x = 690;
   s.y = 940;
+  s.economy!.carriers = 2;
   const m = new GameModel(s);
   run(m, 18000);
   expect(s.zone).toBe(2);

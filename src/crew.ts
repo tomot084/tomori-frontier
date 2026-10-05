@@ -11,7 +11,7 @@ export interface LanternWorker extends Point {
   clock: number;
   heading: number;
 }
-/** Building unlocks a visible harvesting/delivery loop; player inventory is never spent. */
+/** Hired carriers harvest for construction; player inventory is never spent. */
 export class LanternCrew {
   workers: LanternWorker[] = [0, 1].map((id) => ({
     id,
@@ -32,13 +32,14 @@ export class LanternCrew {
       zone = g.s.zone;
     for (const w of this.workers) {
       if (g.s.zone !== zone) break;
-      w.active = zone > w.id && zone < 3;
+      w.active =
+        (g.s.economy?.carriers ?? Math.min(2, zone)) > w.id && zone < 3;
       if (!w.active) continue;
       if (w.zone !== zone) {
         Object.assign(w, {
           zone,
-          x: 690,
-          y: 940 + (zone - 1) * 550,
+          x: zone === 0 ? 570 : 690,
+          y: zone === 0 ? 205 : 940 + (zone - 1) * 550,
           phase: "search",
           cargo: 0,
           clock: 0,

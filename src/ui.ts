@@ -8,6 +8,7 @@ import {
   type Upgrade,
 } from "./data";
 import { GameModel } from "./simulation";
+import { investmentTiles, marketPoint, type Investment } from "./investments";
 const svg = (body: string) =>
   `<svg viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
 export const icons: Record<Resource, string> = {
@@ -26,6 +27,9 @@ export const icons: Record<Resource, string> = {
 };
 export const el = (id: string) => document.getElementById(id)!;
 export class GameUI {
+  investmentOpen = false;
+  selectedInvestment: Investment | null = null;
+  investmentKey = "";
   shopShown = false;
   shopOpen = false;
   toastTimer = 0;
@@ -45,6 +49,43 @@ export class GameUI {
     public model: GameModel,
     private buy: (u: Upgrade) => void,
   ) {
+    el("invest-toggle").onclick = () => this.openInvestments(null);
+    el("invest-return").onclick = () => {
+      model.investments.focus = null;
+      this.closeInvestments();
+    };
+    el("invest-close").onclick = () => this.closeInvestments();
+    el("tile-action").onclick = () =>
+      this.openInvestments(this.model.investments.nearest?.id ?? null);
+    el("investment-options").onclick = (event) => {
+      const button = (event.target as Element).closest<HTMLButtonElement>(
+        "button[data-investment]",
+      );
+      if (!button || button.disabled) return;
+      const id = button.dataset.investment as Investment;
+      const tile = investmentTiles.find((t) => t.id === id)!;
+      const nearby =
+        Math.hypot(tile.x - model.player.x, tile.y - model.player.y) < 100;
+      if (!nearby) {
+        model.investments.focus = id;
+        this.closeInvestments();
+        this.toast(`${tile.name}へ。光る目印をたどろう`);
+      } else if (model.investments.buy(id)) {
+        model.investments.focus = null;
+        this.toast(`${tile.name}に投資した！`);
+        this.investmentKey = "";
+        this.update(true);
+      }
+    };
+    el("market-action").onclick = (event) => {
+      if (
+        (event.target as Element).closest("button") &&
+        model.investments.supply()
+      ) {
+        this.investmentKey = "";
+        this.update(true);
+      }
+    };
     el("shop-toggle").onclick = () => this.toggleShop();
     el("shop-close").onclick = () => this.toggleShop(false);
     el("upgrades").onclick = (e) => {
@@ -53,6 +94,18 @@ export class GameUI {
       );
       if (button && !button.disabled) buy(button.dataset.u as Upgrade);
     };
+  }
+  openInvestments(id: Investment | null) {
+    this.toggleShop(false);
+    this.selectedInvestment = id;
+    this.investmentOpen = true;
+    this.investmentKey = "";
+    el("investment-panel").hidden = false;
+    this.update(true);
+  }
+  closeInvestments() {
+    this.investmentOpen = false;
+    el("investment-panel").hidden = true;
   }
   toast(text: string) {
     el("toast").textContent = text;
@@ -65,8 +118,8 @@ export class GameUI {
   }
   celebrate(index: number) {
     const rewards = [
-      "灯りの精霊が採集・運搬をお手伝い",
-      "精霊が2体に！ 採集で得られる素材も増加",
+      "次の島へ。新しい資源と戦闘で灯貨を稼ごう",
+      "採集量が増加！ 育てた道具と仲間で開拓を進めよう",
       "三つの島を復旧。暁の灯りが戻った！",
     ];
     const card = el("unlock");
@@ -84,6 +137,47 @@ export class GameUI {
   update(started: boolean) {
     const s = this.model.s,
       st = stats(s);
+    const system = this.model.investments,
+      economy = system.economy;
+    const nearest = system.nearest;
+    el("invest-toggle").hidden = !started || this.investmentOpen;
+    el("tile-action").hidden = !started || this.investmentOpen || !nearest;
+    if (nearest)
+      el("tile-action").innerHTML =
+        `<b>${nearest.name}</b><small>${nearest.id === "market" ? "木を売る / 売上を強化" : "費用・効果を見る"} ↗</small>`;
+    el("invest-return").hidden = !system.focus;
+    const investmentKey = JSON.stringify([
+      economy,
+      s.levels,
+      s.resources,
+      nearest?.id,
+      this.selectedInvestment,
+    ]);
+    if (this.investmentOpen && investmentKey !== this.investmentKey) {
+      this.investmentKey = investmentKey;
+      const items = this.selectedInvestment
+        ? investmentTiles.filter((t) => t.id === this.selectedInvestment)
+        : investmentTiles;
+      el("investment-options").innerHTML = items
+        .map((t) => {
+          const o = system.offer(t.id),
+            nearby =
+              Math.hypot(t.x - this.model.player.x, t.y - this.model.player.y) <
+              100;
+          const max = o.level >= o.max;
+          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}体` : t.id === "waiter" ? (o.level ? "雇用済" : "未雇用") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${max ? "MAX" : nearby ? `✦ ${o.price} で${t.id === "carrier" || t.id === "waiter" ? "雇う" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
+        })
+        .join("");
+      const atMarket =
+        Math.hypot(
+          this.model.player.x - marketPoint.x,
+          this.model.player.y - marketPoint.y,
+        ) < 100;
+      el("market-action").innerHTML =
+        this.selectedInvestment === "market"
+          ? `<div class="market-card"><b>木5 → ✦ ${4 + economy.market}<span>販売済 ${economy.sold}個</span></b><p>${economy.waiter ? `預かり木 ${economy.stock} / 30 · 配達係が5個ずつお届け` : "建築に使うか、売って投資するか。木材の使い道は自由。"}</p><button id="market-supply" ${!atMarket || s.resources.wood < (economy.waiter ? 1 : 5) || (economy.waiter && economy.stock >= 30) ? "disabled" : ""}>${atMarket ? (economy.waiter ? "持っている木を預ける" : "木5を売る") : "市場タイルで木を売れます"}</button></div>`
+          : "";
+    }
     const key = JSON.stringify(s.resources) + st.capacity;
     if (key !== this.lastResources) {
       if (!el("resources").children.length)
@@ -134,6 +228,8 @@ export class GameUI {
       s.progress,
       s.resources,
       s.won,
+      system.focus,
+      economy.carriers,
       Math.round(this.model.player.x / 30),
       Math.round(this.model.player.y / 30),
     ]);
@@ -156,19 +252,21 @@ export class GameUI {
         const arrow =
           arrows[(Math.round(Math.atan2(sy, sx) / (Math.PI / 4)) + 8) % 8];
         const building = guide.kind === "build";
+        const focused = investmentTiles.find((t) => t.id === system.focus);
         const title = building
           ? "橋へ素材を届けよう"
           : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;
         el("goal").innerHTML =
-          `<b>${arrow} ${building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${s.zone > 0 ? ` · 精霊${Math.min(2, s.zone)}体がお手伝い` : " · 光る目印へ"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
+          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${economy.carriers > 0 ? ` · 運搬${economy.carriers}体` : " · 市場で木を売って投資もできる"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
       }
     }
     const ready =
       s.levels.gather === 0 && s.resources.coin >= cost(s, "gather");
     el("shop-toggle").querySelector("small")!.textContent = ready
-      ? "木を一撃で切れる！"
+      ? "装備に投資できる"
       : "灯貨で装備を強化";
-    const show = started && (s.zone > 0 || s.resources.coin > 0);
+    const show =
+      started && !this.investmentOpen && (s.zone > 0 || s.resources.coin > 0);
     el("shop-toggle").classList.toggle(
       "upgrade-ready",
       (Object.keys(upgradeData) as Upgrade[]).some(
@@ -192,7 +290,7 @@ export class GameUI {
       el("upgrades").innerHTML = (Object.keys(upgradeData) as Upgrade[])
         .map(
           (u) =>
-            `<button class="${u === "gather" && s.levels.gather === 0 ? "recommended" : ""}" data-u="${u}" ${s.resources.coin < cost(s, u) || s.levels[u] >= 5 ? "disabled" : ""}><i>${symbols[u]}</i><span><b>${upgradeData[u].name}${u === "gather" && s.levels.gather === 0 ? " · おすすめ" : ""}<em>Lv.${s.levels[u]}</em></b><small>${upgradeData[u].description}</small></span><strong>${s.levels[u] >= 5 ? "MAX" : `✦ ${cost(s, u)}`}</strong></button>`,
+            `<button data-u="${u}" ${s.resources.coin < cost(s, u) || s.levels[u] >= 5 ? "disabled" : ""}><i>${symbols[u]}</i><span><b>${upgradeData[u].name}<em>Lv.${s.levels[u]}</em></b><small>${upgradeData[u].description}</small></span><strong>${s.levels[u] >= 5 ? "MAX" : `✦ ${cost(s, u)}`}</strong></button>`,
         )
         .join("");
     }

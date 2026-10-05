@@ -32,9 +32,10 @@ test("resumes existing Phaser v1 progress in 3D with bounded cargo and high-DPI 
   );
   await p.goto("?e2e");
   await p.waitForFunction(() => (window as any).__game);
-  expect(await p.evaluate(() => (window as any).__game.state())).toEqual(
-    legacy,
-  );
+  expect(await p.evaluate(() => (window as any).__game.state())).toEqual({
+    ...legacy,
+    economy: { carriers: 2, waiter: false, market: 0, stock: 0, sold: 0 },
+  });
   await p.getByRole("button", { name: "島へ降りる" }).click();
   await p.waitForTimeout(500);
   const stats = await p.evaluate(() => (window as any).__game.inspect());

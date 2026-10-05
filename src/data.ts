@@ -68,7 +68,15 @@ export const buildingData: Building[] = [
     zone: 3,
   },
 ];
+export interface Economy {
+  carriers: number;
+  waiter: boolean;
+  market: number;
+  stock: number;
+  sold: number;
+}
 export interface Save {
+  economy?: Economy;
   version: 1;
   resources: Record<Resource, number>;
   levels: Record<Upgrade, number>;
@@ -83,6 +91,7 @@ export interface Save {
 }
 export const fresh = (): Save => ({
   version: 1,
+  economy: { carriers: 0, waiter: false, market: 0, stock: 0, sold: 0 },
   resources: { wood: 0, stone: 0, food: 0, coin: 0 },
   levels: { attack: 0, gather: 0, speed: 0, health: 0, capacity: 0 },
   progress: [
@@ -179,6 +188,29 @@ export function load(raw: string | null): Save {
     return {
       ...f,
       ...v,
+      economy: v.economy
+        ? {
+            carriers: Number.isInteger(v.economy.carriers)
+              ? Math.max(0, Math.min(2, v.economy.carriers))
+              : 0,
+            waiter: v.economy.waiter === true,
+            market: Number.isInteger(v.economy.market)
+              ? Math.max(0, Math.min(3, v.economy.market))
+              : 0,
+            stock: Number.isInteger(v.economy.stock)
+              ? Math.max(0, Math.min(30, v.economy.stock))
+              : 0,
+            sold: Number.isInteger(v.economy.sold)
+              ? Math.max(0, v.economy.sold)
+              : 0,
+          }
+        : {
+            carriers: Math.min(2, v.zone),
+            waiter: false,
+            market: 0,
+            stock: 0,
+            sold: 0,
+          },
       x: Math.max(70, Math.min(830, v.x)),
       y: Math.max(
         180,

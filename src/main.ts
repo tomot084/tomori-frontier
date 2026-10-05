@@ -63,6 +63,15 @@ function boot() {
     movement.release();
     debugInput = { x: 0, y: 0 };
   }
+  for (const id of [
+    "invest-toggle",
+    "invest-close",
+    "invest-return",
+    "tile-action",
+    "investment-options",
+    "market-action",
+  ])
+    el(id).addEventListener("click", release);
   el("shop-toggle").addEventListener("click", release);
   el("shop-close").addEventListener("click", release);
   el("start").onclick = () => {
@@ -141,6 +150,12 @@ function boot() {
       inspect: () => ({
         guidance: model.guidance,
         feedback: feedback.metrics(),
+        investments: {
+          economy: model.investments.economy,
+          waiter: model.investments.waiter,
+          focus: model.investments.focus,
+          open: ui.investmentOpen,
+        },
         effects: view.particles.length,
         stick: movement.stick,
         shop: ui.shopShown,
@@ -156,6 +171,7 @@ function boot() {
     const paused =
       !started ||
       ui.shopOpen ||
+      ui.investmentOpen ||
       (el("config") as HTMLDialogElement).open ||
       document.hidden;
     movement.enabled = !paused && !ui.shopOpen;

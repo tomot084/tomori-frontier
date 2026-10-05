@@ -13,6 +13,11 @@ import {
   type Upgrade,
 } from "./data";
 import { LanternCrew } from "./crew";
+import {
+  InvestmentSystem,
+  investmentTiles,
+  customerPoint,
+} from "./investments";
 const capFor = (kind: string, capacity: number) =>
   kind === "food" ? Math.floor(capacity / 2) : capacity;
 export interface Point {
@@ -75,6 +80,7 @@ export class GameModel {
   readonly drops: DropItem[] = [];
   readonly events: GameEvent[] = [];
   readonly crew = new LanternCrew(this);
+  readonly investments = new InvestmentSystem(this);
   player: Point;
   time = 0;
   direction = 0;
@@ -104,6 +110,18 @@ export class GameModel {
             dead: 0,
           });
       }
+    // Keep the hub's investment pads free of trees; retain node IDs and resource supply.
+    for (const n of this.nodes) {
+      if (
+        n.zone === 0 &&
+        [...investmentTiles, customerPoint].some(
+          (t) => Math.hypot(n.x - t.x, n.y - t.y) < 82,
+        )
+      ) {
+        n.x = n.x < 450 ? 150 : 785;
+        n.y = Math.min(610, n.y + 38);
+      }
+    }
     for (let z = 1; z <= 2; z++)
       for (let i = 0; i < 7; i++) {
         const type = i % 3,
@@ -157,6 +175,12 @@ export class GameModel {
     target: Point;
     remaining: number;
   } {
+    if (this.investments.focus) {
+      const tile = investmentTiles.find(
+        (t) => t.id === this.investments.focus,
+      )!;
+      return { kind: "build", target: tile, remaining: 0 };
+    }
     if (this.s.won || this.s.zone >= 3)
       return { kind: "done", target: this.player, remaining: 0 };
     const i = this.s.zone,
@@ -234,8 +258,8 @@ export class GameModel {
       this.burst({ x: 450, y: b.y }, 0xffdc88, 10);
       this.toast(
         delivered === 5
-          ? "橋板ができた！ もう一束届けると道具を強化できる"
-          : "道具を強化しよう。木を一撃で切れる！",
+          ? "橋板ができた！ 灯貨は道具・背かご・雇用に使える"
+          : "8灯貨獲得！ 採集を強化する？ 運搬係を雇う？",
       );
       this.event("save", this.player);
     } else if (
@@ -260,9 +284,9 @@ export class GameModel {
     this.burst({ x: 450, y: b.y }, 0xffdc88, 20);
     this.toast(
       i === 0
-        ? "橋が完成！ 運搬を手伝う灯りの精霊が仲間に"
+        ? "橋が完成！ 新しい資源と敵がいる島へ"
         : i === 1
-          ? "門が開いた！ 精霊が2体に増え、採集量もアップ"
+          ? "門が開いた！ 採集量アップ。投資の成果を次の島へ"
           : "三つの島に、暁の灯りが戻った！",
     );
     if (i === 2) this.s.won = true;
@@ -326,7 +350,7 @@ export class GameModel {
           );
           this.event("death", n, { id: n.id, kind: n.kind });
           if (!this.s.resources.wood && n.kind === "wood")
-            this.toast("近づくと自動で採集。集めた木を橋へ！");
+            this.toast("木を集めた！ 市場で売るか、橋へ届けよう");
         }
       }
     }
@@ -440,6 +464,7 @@ export class GameModel {
       }
     }
     this.crew.step(dt);
+    this.investments.step(dt);
     if (this.atCamp) this.s.hp = Math.min(st.hp, this.s.hp + 18 * dt);
     else if (
       this.s.hp < st.hp * 0.5 &&

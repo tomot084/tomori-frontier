@@ -1119,3 +1119,52 @@ dialog #close {
 .site-label span {
   font-size: 11px;
 }
+
+/* World investments: deliberate purchases, with a readable mobile comparison sheet. */
+#invest-toggle, #tile-action {
+  position: fixed; z-index: 25; border: 2px solid #fff0c2; border-radius: 17px;
+  background: #fff6df; color: #274c4e; box-shadow: 0 4px 0 #c8ac73, 0 7px 18px #20474d33;
+  min-height: 54px; padding: 9px 14px; cursor: pointer;
+}
+#invest-toggle { right: 14px; bottom: 100px; }
+#tile-action { left: 50%; transform: translateX(-50%); bottom: 174px; min-width: 180px; }
+#invest-toggle b, #tile-action b, #invest-toggle small, #tile-action small { display: block; }
+#invest-toggle small, #tile-action small { font-size: 10px; margin-top: 3px; }
+#investment-panel {
+  position: fixed; z-index: 55; inset: auto 12px 20px; margin: 0 auto; max-width: 470px;
+  max-height: min(650px, calc(100dvh - 100px)); overflow-y: auto; overscroll-behavior: contain;
+  background: #fff8e8; color: #29494b; padding: 16px; border-radius: 24px;
+  box-shadow: 0 12px 70px #12363d99; border: 3px solid #fff0c6;
+}
+#investment-panel header { display: flex; justify-content: space-between; align-items: center; }
+#investment-panel header small { font-size: 10px; letter-spacing: 1px; color: #6c8a82; }
+#investment-panel h2 { margin: 3px 0; font-size: 23px; }
+#invest-close { width: 44px; height: 44px; border: none; border-radius: 50%; background: #e6edde; color: #315c59; font-size: 27px; }
+#investment-panel > p { font-size: 11px; margin: 8px 0 12px; }
+.investment-card { display: flex; gap: 8px; align-items: center; margin: 8px 0; padding: 12px 10px; border-radius: 14px; background: #f0f0df; border-left: 5px solid var(--tile-color); }
+.investment-card > div { flex: 1; min-width: 0; }
+.investment-card b { display: block; font-size: 14px; }
+.investment-card em { margin-left: 7px; font-size: 10px; font-style: normal; color: #63827a; }
+.investment-card span { display: block; font-size: 11px; line-height: 1.5; margin-top: 4px; }
+.investment-card small { display: block; font-size: 10px; color: #657f76; margin-top: 3px; }
+.investment-card button, .market-card button { min-height: 48px; border: none; border-radius: 12px; padding: 8px 10px; background: #2d8582; color: white; font-weight: 700; cursor: pointer; }
+.investment-card button { min-width: 94px; font-size: 11px; }
+.investment-card button small { color: #e1f0d4; }
+.investment-card button:disabled, .market-card button:disabled { background: #dce1d4; color: #8b9586; cursor: default; }
+.market-card { padding: 12px; border-radius: 15px; background: #fae2a7; margin-bottom: 10px; }
+.market-card b { display: flex; justify-content: space-between; gap: 10px; }
+.market-card b span { font-weight: 400; font-size: 10px; }
+.market-card p { font-size: 11px; line-height: 1.6; margin: 7px 0; }
+.market-card button { width: 100%; }
+@media (orientation: landscape) and (max-height: 500px) {
+  #invest-toggle { bottom: 90px; } #tile-action { bottom: 25px; left: 45%; }
+  #investment-panel { max-height: calc(100dvh - 35px); bottom: 10px; }
+}
+#investment-options { padding-bottom: 8px; }
+@media (min-height: 750px) and (max-width: 500px) {
+  #investment-panel { max-height: calc(100dvh - 155px); padding: 12px; }
+  .investment-card { padding: 9px 8px; margin: 6px 0; }
+  .market-card { padding: 10px; }
+}
+.customer-label { position: absolute; font-size: 11px; font-weight: 800; color: #355b56; background: #fff4d1; border: 2px solid #f2d99c; border-radius: 13px; padding: 6px 10px; white-space: nowrap; pointer-events: none; box-shadow: 0 3px 0 #36604820; }
+#invest-return { width: 100%; min-height: 44px; margin-top: 8px; border: 1px solid #bbcab9; border-radius: 12px; background: #e4ebdc; color: #365a54; cursor: pointer; }

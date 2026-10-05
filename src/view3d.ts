@@ -1,3 +1,5 @@
+import { InvestmentView } from "./investment-view";
+import { customerPoint } from "./investments";
 import { Keeper } from "./keeper";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
@@ -39,6 +41,8 @@ interface Fragment {
   life: number;
 }
 export class WorldView {
+  investments!: InvestmentView;
+  customerLabel!: HTMLElement;
   keeper = new Keeper();
   async loadAssets() {
     await this.keeper.load(this.art, this.rig);
@@ -411,10 +415,10 @@ export class WorldView {
       this.cargoBounceAt = this.time;
       const key = event.kind!;
       const batch = this.pickupBatches.get(key);
-      if (batch) batch.count++;
+      if (batch) batch.count += event.count ?? 1;
       else
         this.pickupBatches.set(key, {
-          count: 1,
+          count: event.count ?? 1,
           at: this.time,
           x: event.x,
           y: event.y,
@@ -884,6 +888,18 @@ export class WorldView {
       ) {
         casters.push(site.base, ...site.pieces.filter((p) => p.isEnabled()));
       }
+    if (this.investments) {
+      casters.push(
+        ...this.investments.bases.filter(
+          (mesh) =>
+            Vector3.DistanceSquared(mesh.position, this.target) <
+            radius * radius,
+        ),
+      );
+      if (this.model.investments.waiter.active)
+        casters.push(this.investments.waiter.body);
+      casters.push(...this.investments.customers.map((c) => c.body));
+    }
     const shadowKey = casters.map((mesh) => mesh.uniqueId).join(",");
     if (shadowKey !== this.shadowListKey) {
       this.shadows.getShadowMap()!.renderList = casters;
@@ -978,7 +994,11 @@ export class WorldView {
         worldPoint(590, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1.4),
         i <= m.s.zone &&
           (m.s.zone <= i || i === 2) &&
-          Math.abs(m.player.y - buildingData[i].y) < 340,
+          Math.abs(m.player.y - buildingData[i].y) < 340 &&
+          !(
+            i === 0 &&
+            ["market", "waiter"].includes(m.investments.nearest?.id ?? "")
+          ),
       );
     });
     const campPts = [
@@ -1002,6 +1022,24 @@ export class WorldView {
       ),
       guide.kind !== "done" && guide.kind !== "build",
     );
+    if (!this.customerLabel) {
+      this.customerLabel = document.createElement("div");
+      this.customerLabel.className = "customer-label";
+      this.overlay.append(this.customerLabel);
+    }
+    this.customerLabel.textContent =
+      this.model.time - this.model.investments.servedAt < 1500 &&
+      this.model.investments.economy.sold > 0
+        ? "ありがとう！"
+        : `木5 → ✦ ${4 + this.model.investments.economy.market}`;
+    this.place(
+      this.customerLabel,
+      worldPoint(customerPoint.x - 15, customerPoint.y, 1.45),
+      Math.hypot(m.player.x - customerPoint.x, m.player.y - customerPoint.y) <
+        280,
+    );
+    this.investments ??= new InvestmentView(this.art, this.model, this.shadows);
+    this.investments.update(this.time);
     this.scene.render();
   }
   metrics() {

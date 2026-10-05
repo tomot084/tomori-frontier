@@ -67,3 +67,7 @@ feedback cues are generated with Web Audio oscillators after a user gesture;
 there are no audio assets or runtime requests to another origin. These meshes
 and cues ship inside the built JavaScript. The existing third-party licences
 and public-artifact allowlist remain unchanged.
+
+### 投資拠点・市場の追加（2026-10-05）
+
+5種の地面タイルと費用表示（DynamicTexture）、道具台・かご・市場の小物、客用の板張りはプロジェクト内のコードで生成。配達係・客は既存のTomori独自精霊モデルを使用。追加の外部素材、参考画像由来の画像、外部音源は含まない。既存Kenney/QuaterniusのCC0出典は変更なし。
