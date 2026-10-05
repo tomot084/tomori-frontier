@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
-    "test": "vitest run tests/logic.test.ts",
-    "test:browser": "playwright test"
+    "test": "vitest run tests/*.test.ts",
+    "test:browser": "playwright test",
+    "test:production": "npm run build && node scripts/test-production.mjs"
   },
   "dependencies": {
-    "phaser": "^3.90.0"
+    "@babylonjs/core": "^9.29.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

@@ -90,7 +90,12 @@ for (const size of [
           continue;
         }
         await pos(page, n.x, n.y);
-        await page.waitForTimeout(kind === "stone" ? 2200 : 1600);
+        await expect
+          .poll(async () => (await state(page)).resources[kind], {
+            timeout: 12000,
+          })
+          .toBeGreaterThan(s.resources[kind]);
+        await page.waitForTimeout(350);
       }
       throw new Error("gather target failed " + kind);
     }
@@ -111,7 +116,9 @@ for (const size of [
       .toBeGreaterThanOrEqual(5);
     await pos(page, 690, 940);
     await page.waitForTimeout(300);
+    await page.getByRole("button", { name: "工房を開く" }).click();
     await page.getByRole("button", { name: /背かご/ }).click();
+    await page.getByRole("button", { name: "工房を閉じる" }).click();
     expect((await state(page)).levels.capacity).toBe(1);
     await page.screenshot({ path: `screenshots/review2-${size.width}.png` });
     if (size.width === 390) {

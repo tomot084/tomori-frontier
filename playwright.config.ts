@@ -6,6 +6,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.GAME_URL || "http://localhost:5173/tomori-frontier/",
     headless: true,
+    launchOptions: { args: ["--use-angle=swiftshader"] },
   },
   webServer: process.env.GAME_URL
     ? undefined

@@ -1,0 +1,485 @@
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Art, palette, color, worldPoint } from "./models";
+import { buildingData } from "./data";
+import { camps } from "./simulation";
+const rand = (n: number) => {
+  const v = Math.sin(n * 39.7 + 17.5) * 41713.13;
+  return v - Math.floor(v);
+};
+/** Bevelled islands have separate meadow, shoreline lip and stratified cliff faces. */
+function island(art: Art, zone: number, start: number, end: number) {
+  const outline: number[][] = [];
+  const x0 = 65,
+    x1 = 835;
+  outline.push(
+    [x0 + 60, start],
+    [x1 - 60, start],
+    [x1, start + 55],
+    [x1 - 4, start + (end - start) * 0.35],
+    [x1 + 8, start + (end - start) * 0.67],
+    [x1 - 10, end - 55],
+    [x1 - 65, end],
+    [x0 + 65, end],
+    [x0 - 5, end - 45],
+    [x0 + 10, start + (end - start) * 0.7],
+    [x0 - 8, start + (end - start) * 0.3],
+    [x0, start + 55],
+  );
+  const positions: number[] = [],
+    indices: number[] = [],
+    colors: number[] = [];
+  function triangle(a: Vector3, b: Vector3, c: Vector3, hex: number) {
+    const base = positions.length / 3;
+    for (const p of [a, b, c]) positions.push(p.x, p.y, p.z);
+    indices.push(base, base + 2, base + 1);
+    const co = color(hex);
+    for (let i = 0; i < 3; i++) colors.push(co.r, co.g, co.b, 1);
+  }
+  const grass = [0x9bbf79, 0x85b47b, 0x83ac91][zone],
+    center = worldPoint(450, (start + end) / 2, 0.02);
+  for (let i = 0; i < outline.length; i++) {
+    const j = (i + 1) % outline.length;
+    const a = worldPoint(outline[i][0], outline[i][1], 0),
+      b = worldPoint(outline[j][0], outline[j][1], 0);
+    const innerA = Vector3.Lerp(a, center, 0.025),
+      innerB = Vector3.Lerp(b, center, 0.025);
+    innerA.y = 0.02;
+    innerB.y = 0.02;
+    triangle(center, innerA, innerB, grass);
+    const edgeA = a.clone(),
+      edgeB = b.clone();
+    edgeA.y = -0.15;
+    edgeB.y = -0.15;
+    triangle(innerA, edgeA, innerB, 0xb7cb8c);
+    triangle(innerB, edgeA, edgeB, 0xb7cb8c);
+    const midA = edgeA.clone(),
+      midB = edgeB.clone();
+    midA.y = -0.6;
+    midB.y = -0.6;
+    midA.x *= 1.02;
+    midB.x *= 1.02;
+    triangle(edgeA, midA, edgeB, [0x9d9074, 0x9a947b, 0x93998c][zone]);
+    triangle(edgeB, midA, midB, 0x9f9278);
+    const bottomA = midA.clone(),
+      bottomB = midB.clone();
+    bottomA.y = -1.3 - rand(i) * 0.25;
+    bottomB.y = -1.3 - rand(j) * 0.25;
+    bottomA.x *= 0.98;
+    bottomB.x *= 0.98;
+    triangle(midA, bottomA, midB, 0x6e827a);
+    triangle(midB, bottomA, bottomB, 0x7c8c81);
+  }
+  const data = new VertexData();
+  data.positions = positions;
+  data.indices = indices;
+  data.colors = colors;
+  const normals: number[] = [];
+  VertexData.ComputeNormals(positions, indices, normals);
+  data.normals = normals;
+  const m = new Mesh("bevelled-island-" + zone, art.scene);
+  data.applyToMesh(m);
+  m.material = art.material;
+  m.receiveShadows = true;
+  m.isPickable = false;
+  return m;
+}
+export interface BuiltSite {
+  root: TransformNode;
+  pieces: Mesh[];
+  base: Mesh;
+  marker: Mesh;
+  progress: number;
+}
+export function makeScenery(art: Art) {
+  const zones: Mesh[][] = [[], [], []],
+    shadowCasters: Mesh[] = [];
+  const water = art.box("quiet-tide", 0, -1.65, -18, 110, 0.1, 120, 0x74aeb5);
+  water.receiveShadows = false;
+  const ranges = [
+    [170, 692],
+    [768, 1242],
+    [1318, 1965],
+  ];
+  ranges.forEach(([start, end], zone) => {
+    zones[zone].push(island(art, zone, start, end));
+    const details: Mesh[] = [];
+    // A worn footpath curves slightly and varies in width rather than using a grid.
+    for (let j = 0; j < Math.floor((end - start) / 34); j++) {
+      const y = start + 20 + j * 34,
+        x = 450 + Math.sin(j * 0.7 + zone) * 13;
+      const m = art.cylinder(
+        "path-patch",
+        0,
+        0,
+        0,
+        0.6 + rand(j) * 0.23,
+        0.6 + rand(j) * 0.23,
+        0.008,
+        0xc6bd8b,
+        10,
+      );
+      m.scaling.z = 1.35;
+      m.position.copyFrom(worldPoint(x, y, 0.028));
+      details.push(m);
+    }
+    for (let i = 0; i < 100; i++) {
+      const x = 95 + rand(i + zone * 200) * 710,
+        y = start + 32 + rand(i + 83 + zone * 70) * (end - start - 64);
+      if (
+        Math.abs(x - 450) < 60 ||
+        camps.some((c) => Math.hypot(c.x - x, c.y - y) < 92)
+      )
+        continue;
+      const m =
+        i % 9 === 0
+          ? art.flower(i)
+          : i % 11 === 0
+            ? art.rock("meadow-pebble", 0.13 + rand(i) * 0.17, 0xa9bda3, i)
+            : art.grass(i);
+      m.position.copyFrom(worldPoint(x, y, 0.03));
+      m.rotation.y = i * 2.4;
+      details.push(m);
+    }
+    for (let side = 0; side < 2; side++)
+      for (let j = 0; j < 10; j++) {
+        const x = side ? 809 : 88,
+          y = start + 65 + (j * (end - start - 110)) / 10;
+        const m = art.rock("shore-rock", 0.6 + rand(j) * 0.45, 0x99b3a7, j);
+        m.position.copyFrom(worldPoint(x, y, -0.17));
+        m.rotation.y = j;
+        details.push(m);
+      }
+    const merged = art.merge("meadow-and-shore-details-" + zone, details);
+    merged.freezeWorldMatrix();
+    zones[zone].push(merged);
+    // Tide streaks below the shore, not an expensive water shader.
+    const foamParts: Mesh[] = [];
+    for (let j = 0; j < 13; j++) {
+      const x = sideCoordinate(j),
+        y = start + 30 + rand(j + zone * 3) * (end - start - 60);
+      const m = art.box(
+        "tide-streak",
+        0,
+        0,
+        0,
+        0.4 + rand(j) * 0.8,
+        0.014,
+        0.035,
+        0xb6d5ce,
+      );
+      m.position.copyFrom(worldPoint(x, y, -1.56));
+      m.rotation.y = 0.2;
+      foamParts.push(m);
+    }
+    art.merge("tide-lines-" + zone, foamParts).freezeWorldMatrix();
+    const camp = art.camp();
+    camp.position.copyFrom(worldPoint(camps[zone].x, camps[zone].y, 0.03));
+    camp.freezeWorldMatrix();
+    zones[zone].push(camp);
+    shadowCasters.push(camp);
+  });
+  const sites = buildingData.map((b, i) => {
+    const root = new TransformNode("construction-" + i, art.scene);
+    root.position.copyFrom(worldPoint(450, b.y));
+    const pieces: Mesh[] = [],
+      baseParts: Mesh[] = [];
+    let marker: Mesh;
+    if (i < 2) {
+      for (const x of [-1.18, 1.18])
+        baseParts.push(
+          art.box("bridge-joist", x, -0.025, 0, 0.14, 0.18, 2.16, palette.wood),
+        );
+      for (const x of [-1.32, 1.32])
+        for (const z of [-1.05, 1.05]) {
+          baseParts.push(
+            art.cylinder(
+              "foundation-stake",
+              x,
+              0.35,
+              z,
+              0.065,
+              0.1,
+              0.8,
+              0xa77a48,
+              7,
+            ),
+          );
+          baseParts.push(
+            art.cylinder(
+              "stake-cap",
+              x,
+              0.77,
+              z,
+              0.11,
+              0.11,
+              0.065,
+              0xd0ad73,
+              7,
+            ),
+          );
+        }
+      for (let j = 0; j < 10; j++) {
+        const m = art.box(
+          "bridge-deck-" + j,
+          0,
+          0.095,
+          -0.97 + j * 0.215,
+          2.51,
+          0.16,
+          0.2,
+          j % 2 ? 0xc4a475 : 0xb99465,
+        );
+        m.parent = root;
+        pieces.push(m);
+      }
+      if (i === 0) {
+        for (const side of [-1, 1])
+          for (let j = 0; j < 4; j++) {
+            const m = art.box(
+              "handrail",
+              side * 1.29,
+              0.64,
+              -0.75 + j * 0.5,
+              0.055,
+              0.065,
+              0.52,
+              0xe1c792,
+            );
+            m.parent = root;
+            pieces.push(m);
+          }
+      } else {
+        for (const side of [-1, 1]) {
+          const footing = art.cylinder(
+            "gate-foot",
+            side * 1.08,
+            0.15,
+            0,
+            0.32,
+            0.36,
+            0.3,
+            0xc8cabb,
+            6,
+          );
+          const pillar = art.box(
+            "gate-pillar",
+            side * 1.08,
+            0.94,
+            0,
+            0.39,
+            1.63,
+            0.37,
+            0xb5c3b6,
+          );
+          const stripe = art.box(
+            "gate-rune",
+            side * 1.08,
+            1.08,
+            -0.2,
+            0.14,
+            0.62,
+            0.025,
+            palette.teal,
+          );
+          const cap = art.cylinder(
+            "gate-cap",
+            side * 1.08,
+            1.89,
+            0,
+            0.3,
+            0.24,
+            0.2,
+            palette.tealLight,
+            6,
+          );
+          const orb = art.sphere(
+            "gate-light",
+            side * 1.08,
+            2.08,
+            0,
+            0.18,
+            0.28,
+            0.18,
+            palette.gold,
+            true,
+          );
+          const group = art.merge("gate-column", [
+            footing,
+            pillar,
+            stripe,
+            cap,
+            orb,
+          ]);
+          group.parent = root;
+          pieces.push(group);
+        }
+        const lintel = art.box(
+          "gate-lintel",
+          0,
+          1.94,
+          0,
+          2.62,
+          0.25,
+          0.4,
+          0xbaceb9,
+        );
+        lintel.parent = root;
+        pieces.push(lintel);
+        const keystone = art.cylinder(
+          "gate-sunstone",
+          0,
+          2.19,
+          0,
+          0.19,
+          0.26,
+          0.3,
+          palette.gold,
+          6,
+        );
+        keystone.parent = root;
+        pieces.push(keystone);
+      }
+    } else {
+      baseParts.push(
+        art.cylinder(
+          "beacon-foundation",
+          0,
+          0.12,
+          0,
+          1.1,
+          1.24,
+          0.24,
+          0xc2cdb9,
+          10,
+        ),
+      );
+      const pedestal = art.cylinder(
+        "beacon-plinth",
+        0,
+        0.38,
+        0,
+        0.78,
+        0.96,
+        0.5,
+        0xb3c5b9,
+        8,
+      );
+      const stem = art.cylinder(
+        "beacon-column",
+        0,
+        1.17,
+        0,
+        0.36,
+        0.53,
+        1.33,
+        0x98b9af,
+        8,
+      );
+      const ring = art.cylinder(
+        "beacon-collar",
+        0,
+        1.79,
+        0,
+        0.61,
+        0.61,
+        0.18,
+        palette.teal,
+        8,
+      );
+      const cageParts: Mesh[] = [];
+      for (let j = 0; j < 6; j++) {
+        const a = (j * Math.PI) / 3;
+        cageParts.push(
+          art.cylinder(
+            "beacon-frame",
+            Math.cos(a) * 0.46,
+            2.23,
+            Math.sin(a) * 0.46,
+            0.035,
+            0.035,
+            0.85,
+            palette.leather,
+            6,
+          ),
+        );
+      }
+      cageParts.push(
+        art.sphere(
+          "beacon-heart",
+          0,
+          2.2,
+          0,
+          0.61,
+          0.9,
+          0.61,
+          palette.gold,
+          true,
+        ),
+      );
+      const cage = art.merge("lantern-cage", cageParts);
+      const roof = art.cylinder(
+        "beacon-roof",
+        0,
+        2.79,
+        0,
+        0.04,
+        0.75,
+        0.43,
+        palette.teal,
+        8,
+      );
+      for (const m of [pedestal, stem, ring, cage, roof]) {
+        m.parent = root;
+        pieces.push(m);
+      }
+    }
+    // The unfinished site has stakes, supply pallets and a ground-level inlay.
+    const inlay = art.cylinder(
+      "build-inlay",
+      0,
+      0.032,
+      0,
+      1.35,
+      1.35,
+      0.018,
+      0xd1c493,
+      12,
+    );
+    if (i === 2) baseParts.push(inlay);
+    else inlay.dispose();
+    const crate = art.box(
+      "supply-crate",
+      -1.73,
+      0.24,
+      0.4,
+      0.5,
+      0.46,
+      0.46,
+      0xc09860,
+    );
+    baseParts.push(
+      crate,
+      art.box("crate-band", -1.73, 0.26, 0.16, 0.55, 0.06, 0.025, 0xf2d89d),
+    );
+    const base = art.merge("foundation-" + i, baseParts);
+    base.parent = root;
+    marker = MeshBuilder.CreateTorus(
+      "worksite-marking",
+      { diameter: 1.8, thickness: 0.025, tessellation: 24 },
+      art.scene,
+    );
+    art.tint(marker, 0xf4df9c);
+    marker.position.set(0, 0.035, i < 2 ? 1.3 : 0);
+    marker.parent = root;
+    for (const p of pieces) p.setEnabled(false);
+    return { root, pieces, base, marker, progress: -1 };
+  });
+  return { zones, sites, shadowCasters };
+}
+function sideCoordinate(i: number) {
+  return i % 2 ? 45 : 855;
+}

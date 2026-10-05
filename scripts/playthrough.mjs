@@ -1,6 +1,6 @@
 // Continuous play review: shared movement input only. Never grants resources or progress.
 import { chromium } from "@playwright/test";
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ["--use-angle=swiftshader"] });
 const page = await browser.newPage({
   viewport: { width: 390, height: 844 },
   hasTouch: true,
@@ -99,10 +99,12 @@ try {
     if (index < 2) {
       await move(690, 940 + index * 550);
       await page.waitForTimeout(4000);
+      await page.getByRole("button", { name: "工房を開く" }).click();
       for (const pattern of [/背かご/, /灯刃/, /道具/]) {
         const button = page.getByRole("button", { name: pattern });
         if (await button.isEnabled()) await button.click();
       }
+      await page.getByRole("button", { name: "工房を閉じる" }).click();
       await page.waitForTimeout(2000);
     }
   }
