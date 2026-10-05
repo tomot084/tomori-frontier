@@ -58,6 +58,15 @@
 - production既存ブラウザ6件が成功（約5分）：灯台までの全進行、スマホ2サイズ、PC、縦横切替、旧セーブ復元。
 - 追加テストで別資源の回収がHUD再構築によって木材の光を消す問題を検出。要素を保持して数値だけ更新するよう修正し、production右側タッチ・回収テストとPC全進行が再成功。
 - 岸辺の装飾木の透過後にも、production build・単体10件・dist監査・production右側タッチ/回収・旧セーブ復元が成功。人物が木越しに読めるスクリーンショットを再確認。
-- GitHub PagesのCI・公開画面の最終結果は公開完了後に記録。
+- GitHub Actionsでも単体10件・ブラウザ7件（約5.3分）・production build・dist監査70ファイルがすべて成功。
+- 公開ソースcommit：`0e855197ba5f0e7e62574a1d58fc70238538d178`。
+- Pages deploy成功：[Actions実行](https://github.com/tomot084/tomori-frontier/actions/runs/37282102287)。
+- 公開URL：https://tomot084.github.io/tomori-frontier/
+- 公開版JS `index-BM66eLJz.js` がローカル最終buildと一致。
+- 公開版390×844 / 1280×720を実ブラウザで表示・採集・撮影。console error 0 / asset 404 0。
+- PC開始画面の撮影で地形が映らないフレームが再度1枚あったため、公開版の静止状態を連続3回撮影し、3枚とも地形と人物が正常に描画されることを確認。撮影フレーム欠落の原因自体は特定していない。`screenshots/pc-frame-0.png`〜`pc-frame-2.png` に証拠を保存。最終PC比較画像はその正常表示の3枚目。
+- 最終公開スマホ・PC比較画像は `screenshots/polish-after-390.png` / `polish-after-1280.png`。採集後は `polish-action-390.png` / `polish-action-1280.png`。
+
+この引き継ぎの公開結果追記は文書のみ。ゲーム配信ファイルとCI・デプロイの対象ソースは上記commit。
 
 実機Safari/Androidの性能測定は未実施。Chromiumのスマホエミュレーション。WSLのソフトウェアWebGLのFPSを実機FPSとは扱わない。
