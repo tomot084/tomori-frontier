@@ -17,7 +17,7 @@ export class Keeper {
   private grip!: ReturnType<Art["player"]>["toolPivot"];
   async load(art: Art, rig: ReturnType<Art["player"]>, roleColor = 0x46b5b1) {
     const container = await (Keeper.container ??= LoadAssetContainerAsync(
-      import.meta.env.BASE_URL + "models/keeper.glb",
+      import.meta.env.BASE_URL + "models/keeper.glb?v=be37133ee215",
       art.scene,
     ));
     const instance = container.instantiateModelsToScene((name) => name, false, {

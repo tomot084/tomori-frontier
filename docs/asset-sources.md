@@ -107,3 +107,7 @@ belt, cutting wheel, plank piles and lantern-currency objects are original code
 geometry. No Factory Kit ZIP or model is distributed. No other external assets
 were searched for or added. User reference images, original downloads, candidate
 files and screenshots stay outside published artifacts.
+
+The runtime character URL carries `v=be37133ee215` (the published GLB SHA-256
+prefix), so the 10-minute Pages/browser cache cannot reuse the former Ranger
+for the new rig loader. When replacing the GLB, update this revision too.

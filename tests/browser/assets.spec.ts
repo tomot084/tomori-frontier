@@ -11,7 +11,7 @@ test("self-hosted character is ready before play and animates during real moveme
   });
   page.on("response", (response) => {
     if (response.status() >= 400) errors.push(response.url());
-    if (response.url().endsWith("models/keeper.glb"))
+    if (new URL(response.url()).pathname.endsWith("models/keeper.glb"))
       modelResponses.push(response.url());
   });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -25,6 +25,7 @@ test("self-hosted character is ready before play and animates during real moveme
     expect.arrayContaining(["Idle", "Run", "Punch", "PickUp"]),
   );
   expect(modelResponses).toHaveLength(1);
+  expect(new URL(modelResponses[0]).searchParams.get("v")).toBe("be37133ee215");
   expect(new URL(modelResponses[0]).origin).toBe(new URL(page.url()).origin);
   await page.keyboard.down("ArrowRight");
   await expect.poll(async () => (await inspect()).keeper.clip).toBe("Run");
