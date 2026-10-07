@@ -1,8 +1,5 @@
-import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
-import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
-import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
-import { Art, color, palette, worldPoint } from "./models";
+import { Art, palette, worldPoint } from "./models";
 import { investmentTiles, customerPoint, marketPoint } from "./investments";
 import type { GameModel } from "./simulation";
 export class InvestmentView {
@@ -10,47 +7,90 @@ export class InvestmentView {
   customers: ReturnType<Art["helper"]>[] = [];
   bases: ReturnType<Art["merge"]>[] = [];
   stock: ReturnType<Art["merge"]>;
-  paints: {
-    texture: DynamicTexture;
-    tile: (typeof investmentTiles)[number];
-  }[] = [];
-  paintKey = "";
   constructor(
     private art: Art,
     private game: GameModel,
     shadows: ShadowGenerator,
   ) {
     for (const tile of investmentTiles) {
-      const parts = [
-        art.box(
-          `${tile.id}-foundation`,
-          0,
-          0.025,
-          0,
-          1.45,
-          0.05,
-          1.25,
-          0x82936b,
-        ),
-      ];
+      const parts: import("@babylonjs/core/Meshes/mesh").Mesh[] = [];
       // Each investment has an original miniature prop, readable without a floating panel.
       if (["conveyor", "hauler", "sawyer"].includes(tile.id)) {
-        for (const x of [-0.7, 0.7])
+        if (tile.id === "conveyor") {
+          for (const z of [0.2, 0.9])
+            parts.push(
+              art.box(
+                "unfinished-feed-rail",
+                0,
+                0.4,
+                z,
+                1.65,
+                0.14,
+                0.12,
+                palette.stone,
+              ),
+            );
+          for (const x of [-0.7, 0.7])
+            parts.push(
+              art.box("rail-foot", x, 0.2, 0.55, 0.12, 0.4, 0.8, palette.wood),
+            );
+        } else if (tile.id === "hauler") {
           parts.push(
             art.box(
-              "survey-stake",
-              x,
-              0.25,
-              0.6,
-              0.09,
+              "empty-handcart",
+              0,
               0.5,
-              0.09,
-              palette.wood,
+              0.6,
+              1.1,
+              0.15,
+              0.85,
+              palette.cut,
             ),
           );
-        parts.push(
-          art.box("survey-sign", 0.7, 0.45, 0.6, 0.4, 0.25, 0.06, palette.cut),
-        );
+          for (const x of [-0.6, 0.6]) {
+            const wheel = art.cylinder(
+              "handcart-wheel",
+              x,
+              0.3,
+              0.6,
+              0.32,
+              0.32,
+              0.14,
+              palette.ink,
+            );
+            wheel.rotation.z = Math.PI / 2;
+            parts.push(wheel);
+            parts.push(
+              art.box(
+                "cart-handle",
+                x,
+                0.6,
+                -0.15,
+                0.09,
+                0.1,
+                1.4,
+                palette.wood,
+              ),
+            );
+          }
+        } else {
+          parts.push(
+            art.box(
+              "empty-sawyer-bench",
+              0,
+              0.7,
+              0.6,
+              1.3,
+              0.18,
+              0.7,
+              palette.cut,
+            ),
+          );
+          for (const x of [-0.5, 0.5])
+            parts.push(
+              art.box("bench-leg", x, 0.35, 0.6, 0.12, 0.7, 0.6, palette.wood),
+            );
+        }
       } else if (tile.id === "tool") {
         parts.push(
           art.box("workbench", 0, 0.55, 0.65, 1.5, 0.22, 0.65, palette.wood),
@@ -83,6 +123,68 @@ export class InvestmentView {
             palette.stoneLight,
           ),
         );
+      } else if (tile.id === "carrier") {
+        parts.push(
+          art.cylinder(
+            "chopping-block",
+            0,
+            0.3,
+            0.5,
+            0.5,
+            0.6,
+            0.6,
+            palette.wood,
+          ),
+        );
+        const axe = art.blade();
+        axe.position.set(0, 0.8, 0.4);
+        parts.push(axe);
+        parts.push(
+          art.box(
+            "hiring-axe-handle",
+            0,
+            0.73,
+            0.6,
+            0.09,
+            0.8,
+            0.09,
+            palette.cut,
+          ),
+        );
+        for (let i = 0; i < 3; i++) {
+          const log = art.log("woodcutter-bundle");
+          log.position.set(-0.55, 0.16 + i * 0.25, -0.25);
+          parts.push(log);
+        }
+      } else if (tile.id === "waiter") {
+        parts.push(
+          art.box("empty-sales-desk", 0, 0.8, 0.6, 1.2, 0.15, 0.65, 0x8c539d),
+        );
+        for (const x of [-0.45, 0.45])
+          parts.push(
+            art.box(
+              "sales-desk-leg",
+              x,
+              0.4,
+              0.6,
+              0.12,
+              0.8,
+              0.5,
+              palette.wood,
+            ),
+          );
+        parts.push(
+          art.box(
+            "empty-sales-tray",
+            0,
+            0.92,
+            0.6,
+            0.85,
+            0.06,
+            0.45,
+            palette.cream,
+          ),
+        );
       } else if (tile.id === "basket") {
         parts.push(
           art.box("basket", 0, 0.55, 0.6, 1.12, 0.86, 0.65, palette.wood),
@@ -106,13 +208,22 @@ export class InvestmentView {
               1.12,
               0.7,
               0.12,
-              2,
+              2.8,
               0.12,
               palette.leather,
             ),
           );
         parts.push(
-          art.box("market-canopy", 0, 2.04, 0.6, 2.12, 0.22, 1.1, tile.color),
+          art.box(
+            "market-canopy",
+            0,
+            2.65,
+            0.6,
+            3.05,
+            0.22,
+            1.55,
+            palette.teal,
+          ),
         );
         for (const x of [-0.48, 0, 0.48])
           parts.push(
@@ -128,29 +239,114 @@ export class InvestmentView {
             ),
           );
       } else if (tile.id === "sawmill") {
+        // Feed funnel on the right; narrow pale lumber exits on the left.
         parts.push(
-          art.box("saw-table", 0, 0.7, 0.6, 1.7, 0.24, 0.85, palette.wood),
+          art.box("machine-bed", 0, 0.86, 0, 3.3, 0.28, 1.1, palette.ink),
         );
+        for (const x of [-1.35, 1.35])
+          for (const z of [-0.42, 0.42])
+            parts.push(
+              art.box(
+                "machine-foot",
+                x,
+                0.43,
+                z,
+                0.22,
+                0.86,
+                0.22,
+                palette.teal,
+              ),
+            );
+        for (const z of [-0.65, 0.65]) {
+          parts.push(
+            art.box("feed-funnel", 1.12, 1.13, z, 1.2, 0.3, 0.18, palette.teal),
+          );
+          parts.push(
+            art.box(
+              "output-guide",
+              -1.1,
+              1.02,
+              z * 0.65,
+              1.2,
+              0.14,
+              0.1,
+              palette.cut,
+            ),
+          );
+        }
         for (const x of [-0.65, 0.65])
           parts.push(
-            art.box("saw-leg", x, 0.4, 0.6, 0.15, 0.8, 0.7, palette.leather),
+            art.box(
+              "saw-guard-post",
+              x,
+              1.63,
+              0.48,
+              0.18,
+              1.5,
+              0.18,
+              palette.teal,
+            ),
           );
-        const saw = art.cylinder(
-          "saw-wheel",
-          0.1,
-          1,
-          0.6,
-          0.44,
-          0.44,
-          0.12,
-          palette.stoneLight,
-          12,
-        );
-        saw.rotation.x = Math.PI / 2;
-        parts.push(saw);
         parts.push(
-          art.box("raw-timber", -0.4, 0.94, 0.15, 1.2, 0.17, 0.23, palette.cut),
+          art.box("saw-guard-arch", 0, 2.4, 0.4, 1.5, 0.25, 0.5, palette.teal),
         );
+        parts.push(
+          art.box("guard-light", 0, 2.43, 0.12, 0.55, 0.12, 0.06, palette.gold),
+        );
+        parts.push(
+          art.box(
+            "motor-housing",
+            0.15,
+            1.4,
+            0.43,
+            0.95,
+            1.05,
+            0.62,
+            palette.teal,
+          ),
+        );
+        for (let i = 0; i < 3; i++)
+          parts.push(
+            art.box(
+              "motor-vent",
+              -0.15 + i * 0.24,
+              1.48,
+              0.76,
+              0.09,
+              0.42,
+              0.035,
+              palette.ink,
+            ),
+          );
+        parts.push(
+          art.box(
+            "amber-switch",
+            0.7,
+            1.25,
+            -0.58,
+            0.26,
+            0.26,
+            0.14,
+            palette.gold,
+          ),
+        );
+        const timber = art.log("feed-example-log");
+        timber.scaling.setAll(1.6);
+        timber.position.set(1.05, 1.08, 0);
+        parts.push(timber);
+        for (let i = 0; i < 3; i++)
+          parts.push(
+            art.box(
+              "exit-example-plank",
+              -1.13,
+              1.06 + i * 0.13,
+              0,
+              1.05,
+              0.1,
+              0.42,
+              palette.cut,
+            ),
+          );
       } else if (tile.id === "quarry") {
         for (let i = 0; i < 3; i++) {
           const rock = art.rock("cut-stone", 0.62, palette.stoneLight, i);
@@ -233,33 +429,50 @@ export class InvestmentView {
           ),
         );
       }
+      if (tile.id === "market") {
+        for (let i = 0; i < 7; i++)
+          parts.push(
+            art.box(
+              "awning-stripe",
+              (i - 3) * 0.42,
+              2.78,
+              0.6,
+              0.21,
+              0.04,
+              1.55,
+              palette.cream,
+            ),
+          );
+        for (let i = 0; i < 4; i++)
+          parts.push(
+            art.box(
+              "sale-plank",
+              -0.35,
+              1.1 + i * 0.14,
+              0.55,
+              1.2,
+              0.11,
+              0.4,
+              palette.cut,
+            ),
+          );
+      }
+      const purchaseSeal = art.cylinder(
+        "gold-purchase-cap",
+        0.85,
+        0.32,
+        -0.5,
+        0.16,
+        0.2,
+        0.18,
+        palette.gold,
+        8,
+      );
+      parts.push(purchaseSeal);
       const base = art.merge(`investment-${tile.id}`, parts);
       base.position.copyFrom(worldPoint(tile.x, tile.y));
       this.bases.push(base);
       shadows.addShadowCaster(base);
-      const plane = MeshBuilder.CreatePlane(
-        `tile-${tile.id}`,
-        { width: 1.85, height: 1.55 },
-        art.scene,
-      );
-      plane.rotation.x = Math.PI / 2;
-      plane.position.copyFrom(worldPoint(tile.x, tile.y, 0.13));
-      const tex = new DynamicTexture(
-        `investment-${tile.id}-paint`,
-        { width: 256, height: 256 },
-        art.scene,
-        false,
-      );
-      this.paints.push({ texture: tex, tile });
-      tex.hasAlpha = true;
-      tex.update();
-      const material = new StandardMaterial(`${tile.id}-paint`, art.scene);
-      material.diffuseTexture = tex;
-      material.specularColor = color(0);
-      material.backFaceCulling = false;
-      plane.material = material;
-      plane.isPickable = false;
-      plane.receiveShadows = true;
     }
     this.waiter = art.helper(1);
     shadows.addShadowCaster(this.waiter.body);
@@ -304,42 +517,12 @@ export class InvestmentView {
     );
   }
   update(time: number) {
-    const key = JSON.stringify([
-      this.game.s.levels,
-      this.game.investments.economy.carriers,
-      this.game.investments.economy.waiter,
-      this.game.investments.economy.market,
-      this.game.investments.economy.perks,
-      this.game.investments.production.conveyor,
-      this.game.investments.production.hauler,
-      this.game.investments.production.sawyer,
-    ]);
-    if (key !== this.paintKey) {
-      this.paintKey = key;
-      for (const { texture, tile } of this.paints) {
-        const c = texture.getContext() as CanvasRenderingContext2D;
-        c.clearRect(0, 0, 256, 256);
-        // A small survey outline belongs to the world; prices belong to the local action.
-        c.strokeStyle = "#c8bc8b";
-        c.lineWidth = 3;
-        c.setLineDash([14, 22]);
-        c.strokeRect(36, 36, 184, 184);
-        texture.update();
-      }
-    }
     for (const base of this.bases) {
       if (base.name === "investment-bounty")
         base.setEnabled(this.game.s.zone > 0);
       for (const id of ["conveyor", "hauler", "sawyer"] as const)
         if (base.name === `investment-${id}`)
           base.setEnabled(!this.game.investments.production[id]);
-    }
-    for (const { texture, tile } of this.paints) {
-      const plane = this.art.scene.getMeshByName(`tile-${tile.id}`);
-      const offer = this.game.investments.offer(tile.id);
-      plane?.setEnabled(
-        offer.level === 0 && (tile.id !== "bounty" || this.game.s.zone > 0),
-      );
     }
     const w = this.game.investments.waiter;
     this.waiter.root.setEnabled(w.active);

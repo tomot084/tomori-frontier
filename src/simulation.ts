@@ -135,6 +135,11 @@ export class GameModel {
         n.y = Math.min(610 + n.zone * 550, n.y + 38);
       }
     }
+    // One existing harvest tree anchors the visible grove beside the raw-timber inlet.
+    // Keep its identity, yield and respawn; only the hub composition changes.
+    const inletTree = this.nodes.find((n) => n.id === "node-0-2")!;
+    inletTree.x = 360;
+    inletTree.y = 255;
     for (let z = 1; z <= 2; z++)
       for (let i = 0; i < 7; i++) {
         const type = i % 3,

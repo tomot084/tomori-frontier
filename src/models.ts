@@ -16,7 +16,7 @@ export const palette = {
   tealLight: 0x55afb0,
   ink: 0x213e49,
   leather: 0xb26c3e,
-  wood: 0xab7548,
+  wood: 0x75452f,
   cut: 0xf0c588,
   leaf: 0x66ac69,
   leafLight: 0xa8d377,
@@ -193,7 +193,64 @@ export class Art {
     core.rotation.z = Math.PI / 2;
     return this.merge(name, [body, ...ends, ring, core]);
   }
-  tree(seed: number, zone = 0) {
+  tree(seed: number, zone = 0, harvestable = true) {
+    if (harvestable) {
+      const parts: Mesh[] = [
+        this.cylinder(
+          "harvest-trunk",
+          0,
+          0.82,
+          0,
+          0.22,
+          0.34,
+          1.65,
+          palette.wood,
+          7,
+        ),
+      ];
+      for (const side of [-1, 1]) {
+        const branch = this.cylinder(
+          "harvest-branch",
+          side * 0.28,
+          1.25,
+          0,
+          0.07,
+          0.12,
+          0.8,
+          palette.wood,
+          6,
+        );
+        branch.rotation.z = side * -0.65;
+        parts.push(branch);
+      }
+      for (let i = 0; i < 3; i++)
+        parts.push(
+          this.sphere(
+            "harvest-crown",
+            (i - 1) * 0.55,
+            2.08 + (i === 1 ? 0.48 : 0),
+            0,
+            1.5,
+            1.5,
+            1.45,
+            [0x49a65b, 0x81c75a, 0x61b44f][i],
+            true,
+          ),
+        );
+      parts.push(
+        this.box(
+          "fresh-trunk-notch",
+          0,
+          0.55,
+          -0.27,
+          0.32,
+          0.12,
+          0.09,
+          palette.cut,
+        ),
+      );
+      return this.merge("harvestable-broadleaf-tree", parts);
+    }
     const names = [
       "tree_oak",
       "tree_pineRoundD",
@@ -216,15 +273,14 @@ export class Art {
     data.normals = source.normals;
     data.uvs = new Array((source.positions.length / 3) * 2).fill(0);
     data.colors = source.colors.map((v, i) => {
+      if (i % 4 === 3) return v;
       const base = i - (i % 4);
-      const foliage = source.colors[base + 1] > source.colors[base] * 1.1;
-      if (!foliage || i % 4 === 3) return v;
-      const tint = [
-        [1.06, 1.02, 1.05],
-        [0.88, 1.02, 1.2],
-        [1.17, 1.03, 0.98],
-      ][zone];
-      return Math.min(1, v * tint[i % 4]);
+      const grey =
+        (source.colors[base] +
+          source.colors[base + 1] +
+          source.colors[base + 2]) /
+        3;
+      return v * 0.42 + grey * 0.58;
     });
     data.indices = source.indices;
     data.applyToMesh(mesh);
@@ -234,19 +290,7 @@ export class Art {
     mesh.rotation.y = noise(seed) * Math.PI * 2;
     const scale = 0.88 + noise(seed + 9) * 0.2;
     mesh.scaling.set(scale, scale, scale);
-    // Gold lantern fruit ties the imported vegetation to Tomori's original islands.
-    const fruit = this.sphere(
-      "lantern-fruit",
-      0.19,
-      1.1,
-      0.27,
-      0.15,
-      0.2,
-      0.15,
-      palette.gold,
-      true,
-    );
-    return this.merge("lantern-tree", [mesh, fruit]);
+    return this.merge("decorative-forest-tree", [mesh]);
   }
 
   boulder(seed: number) {

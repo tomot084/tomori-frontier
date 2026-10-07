@@ -163,7 +163,7 @@ export function makeScenery(art: Art) {
     if (zone === 0) {
       // Forest behind camp fills the opening view, leaving the walking route clear.
       for (let i = 0; i < 14; i++) {
-        const tree = art.tree(90 + i, 0);
+        const tree = art.tree(90 + i, 0, false);
         tree.position.copyFrom(
           worldPoint(145 + (i % 7) * 100, 55 + Math.floor(i / 7) * 92),
         );
@@ -179,7 +179,7 @@ export function makeScenery(art: Art) {
       const side = i % 2;
       const x = side ? 775 + rand(i) * 32 : 95 + rand(i) * 40;
       const y = start + 40 + (Math.floor(i / 2) * (end - start - 80)) / 10;
-      const tree = art.tree(i + zone * 47, zone);
+      const tree = art.tree(i + zone * 47, zone, false);
       tree.scaling.setAll(0.7 + rand(i + 4) * 0.25);
       tree.position.copyFrom(worldPoint(x, y));
       tree.name = `border-tree-${zone}-${i}`;
@@ -511,6 +511,35 @@ export function makeScenery(art: Art) {
     );
     if (i === 2) baseParts.push(inlay);
     else inlay.dispose();
+    if (i < 2) {
+      // A few fitted deck boards and loose lengths reveal the unfinished bridge.
+      for (let j = 0; j < 3; j++)
+        baseParts.push(
+          art.box(
+            "unfinished-deck",
+            0,
+            0.09,
+            -0.94 + j * 0.23,
+            2.5,
+            0.15,
+            0.2,
+            palette.cut,
+          ),
+        );
+      for (let j = 0; j < 4; j++)
+        baseParts.push(
+          art.box(
+            "bridge-supply-plank",
+            -1.85,
+            0.15 + j * 0.13,
+            -0.45,
+            0.5,
+            0.11,
+            1.45,
+            palette.cut,
+          ),
+        );
+    }
     const crate = art.box(
       "supply-crate",
       -1.73,

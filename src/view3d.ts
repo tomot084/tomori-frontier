@@ -58,11 +58,11 @@ export class WorldView {
     this.actors.get("player")!.mesh = this.rig.body;
     this.investments = new InvestmentView(this.art, this.model, this.shadows);
     for (const [role, id, tint] of [
-      ["crew", 0, 0xd69857],
-      ["crew", 1, 0x99b87c],
-      ["waiter", 0, 0xc7b27b],
-      ["hauler", 0, 0x83b7ce],
-      ["sawyer", 0, 0xb99076],
+      ["crew", 0, 0xd36c39],
+      ["crew", 1, 0xd36c39],
+      ["waiter", 0, 0x8c539d],
+      ["hauler", 0, 0x397fb5],
+      ["sawyer", 0, 0xe3b33e],
       ["customer", 0, 0xbbadce],
       ["customer", 1, 0xb4c69d],
     ] as [string, number, number][]) {
@@ -70,6 +70,58 @@ export class WorldView {
         keeper = new Keeper();
       rig.root.scaling.setAll(role === "customer" ? 0.78 : 0.94);
       await keeper.load(this.art, rig, tint);
+      if (role !== "customer") {
+        const apron = this.art.box(
+          "role-apron-" + role,
+          0,
+          1.05,
+          0.36,
+          0.55,
+          0.68,
+          0.06,
+          role === "waiter" ? palette.cream : tint,
+        );
+        apron.parent = rig.torso;
+      }
+      if (role === "hauler") {
+        const frame = this.art.box(
+          "carrier-back-frame",
+          0,
+          1.2,
+          -0.5,
+          0.85,
+          1.2,
+          0.15,
+          palette.wood,
+        );
+        frame.parent = rig.torso;
+      }
+      if (role === "sawyer") {
+        const helmet = this.art.cylinder(
+          "sawyer-hardhat",
+          0,
+          2.4,
+          0,
+          0.3,
+          0.4,
+          0.24,
+          palette.gold,
+        );
+        helmet.parent = rig.root;
+      }
+      if (role === "waiter") {
+        const tray = this.art.box(
+          "sales-tray",
+          0.45,
+          0.95,
+          0.28,
+          0.7,
+          0.09,
+          0.5,
+          palette.cut,
+        );
+        tray.parent = rig.torso;
+      }
       rig.root.setEnabled(false);
       this.people.push({ rig, keeper, role, id });
     }
@@ -363,7 +415,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 8.3 : 9.1;
+    const halfHeight = ratio < 0.8 ? 8.3 * 1.08 : 9.1;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -1101,7 +1153,7 @@ export class WorldView {
         worldPoint(campPts[i][0], campPts[i][1] - 10, 1.9),
         i <= m.s.zone &&
           Math.hypot(m.player.x - campPts[i][0], m.player.y - campPts[i][1]) <
-            125,
+            75,
       ),
     );
     this.place(
@@ -1207,8 +1259,7 @@ export class WorldView {
           kind ===
             (role === "crew" && m.crew.workers[id].kind === "stone"
               ? "stone"
-              : "wood") &&
-            (role === "crew" || role === "sawyer"),
+              : "wood") && role === "crew",
         );
     }
     this.scene.render();

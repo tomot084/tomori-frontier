@@ -28,6 +28,7 @@ export class ProductionView {
   slats: Mesh[] = [];
   saw: Mesh;
   workpiece: InstancedMesh;
+  finishedPiece: InstancedMesh;
   labels: HTMLElement[] = [];
   constructor(
     private art: Art,
@@ -63,33 +64,120 @@ export class ProductionView {
       mesh.isVisible = true;
       mesh.visibility = 1;
       const matrices = new Float32Array(100 * 16);
-      const cols = kind === "coin" ? 5 : 3;
+      const cols = kind === "coin" ? 5 : 4;
       for (let i = 0; i < 100; i++) {
         const row = Math.floor(i / cols);
         Matrix.Translation(
-          ((i % cols) - (cols - 1) / 2) * 0.42,
-          0.48 + row * (kind === "wood" ? 0.3 : 0.22),
-          Math.sin(row * 2) * 0.045,
+          ((i % cols) - (cols - 1) / 2) * (kind === "wood" ? 0.46 : 0.38),
+          (kind === "coin" ? 1.05 : 1.1) +
+            Math.floor(row / 4) * (kind === "wood" ? 0.42 : 0.18),
+          ((row % 4) - 1.5) * (kind === "coin" ? 0.24 : 0.36),
         ).copyToArray(matrices, i * 16);
       }
       mesh.position.copyFrom(worldPoint(at.x, at.y));
-      if (kind === "coin") mesh.scaling.setAll(0.7);
+      if (kind === "wood") mesh.rotation.y = Math.PI / 2;
+      if (kind === "coin") mesh.scaling.setAll(1.15);
+      else mesh.scaling.setAll(kind === "wood" ? 1.45 : 1.25);
       mesh.thinInstanceSetBuffer("matrix", matrices, 16, true);
       mesh.thinInstanceCount = 0;
       mesh.setEnabled(false);
       mesh.alwaysSelectAsActiveMesh = true;
       this.piles.push({ mesh, kind, at });
-      const base = art.box(
-        "stock-pallet",
-        0,
-        0.15,
-        0,
-        1.9,
-        0.25,
-        1.3,
-        kind === "coin" ? palette.teal : palette.wood,
-      );
-      base.position.addInPlace(worldPoint(at.x, at.y));
+      const fittings: Mesh[] = [];
+      if (kind === "wood") {
+        for (const x of [-1.05, 1.05]) {
+          fittings.push(
+            art.box(
+              "log-cradle-foot",
+              x,
+              0.2,
+              0,
+              0.2,
+              0.25,
+              1.65,
+              palette.wood,
+            ),
+          );
+          for (const z of [-0.75, 0.75])
+            fittings.push(
+              art.box(
+                "log-cradle-upright",
+                x,
+                0.68,
+                z,
+                0.17,
+                1.2,
+                0.17,
+                palette.wood,
+              ),
+            );
+        }
+        // Fixed cut ends are a material sample, separate from live stock.
+        for (let i = 0; i < 6; i++) {
+          const log = art.log("cradle-material-sample");
+          log.scaling.setAll(1.65);
+          log.rotation.y = Math.PI / 2;
+          log.position.set(
+            ((i % 3) - 1) * 0.48,
+            0.44 + Math.floor(i / 3) * 0.43,
+            -0.3,
+          );
+          fittings.push(log);
+        }
+      } else if (kind === "plank") {
+        for (const z of [-0.6, 0.6])
+          fittings.push(
+            art.box(
+              "lumber-bearer",
+              0,
+              0.18,
+              z,
+              2.15,
+              0.25,
+              0.19,
+              palette.wood,
+            ),
+          );
+        for (let i = 0; i < 5; i++)
+          fittings.push(
+            art.box(
+              "lumber-material-sample",
+              0,
+              0.37 + i * 0.15,
+              -0.28,
+              1.95,
+              0.12,
+              0.38,
+              palette.cut,
+            ),
+          );
+        for (const x of [-0.65, 0.65])
+          fittings.push(
+            art.box(
+              "lumber-binding",
+              x,
+              0.69,
+              -0.28,
+              0.08,
+              0.8,
+              0.41,
+              palette.teal,
+            ),
+          );
+      } else {
+        fittings.push(
+          art.box("coin-till", 0, 0.55, 0, 1.2, 1, 0.85, palette.teal),
+        );
+        fittings.push(
+          art.box("till-slot", 0, 1.07, 0, 0.6, 0.04, 0.13, palette.ink),
+        );
+        const emblem = art.resource("coin", "till-coin-emblem");
+        emblem.scaling.setAll(2.6);
+        emblem.position.set(0, 0.68, -0.46);
+        fittings.push(emblem);
+      }
+      const base = art.merge("stock-rack-" + kind, fittings);
+      base.position.copyFrom(worldPoint(at.x, at.y));
       const label = document.createElement("div");
       label.className = "line-label";
       overlay.append(label);
@@ -111,6 +199,28 @@ export class ProductionView {
       }
     this.workpiece = this.sources.wood.createInstance("belt-timber");
     this.workpiece.setEnabled(false);
+    this.finishedPiece = this.sources.plank.createInstance(
+      "sawn-board-on-outfeed",
+    );
+    this.finishedPiece.scaling.setAll(1.5);
+    this.finishedPiece.setEnabled(false);
+    // Small physical chevrons live on the roller table, never on a text floor panel.
+    for (const offset of [-1.25, 1.25]) {
+      for (const side of [-1, 1]) {
+        const arrow = art.box(
+          "feed-direction-inlay",
+          offset,
+          1.03,
+          -0.46 + side * 0.075,
+          0.25,
+          0.035,
+          0.055,
+          palette.gold,
+        );
+        arrow.rotation.y = side * -0.65;
+        arrow.position.addInPlace(worldPoint(sawPoint.x, sawPoint.y));
+      }
+    }
     this.conveyor = new TransformNode("purchased-conveyor", art.scene);
     const belt = art.box(
       "teal-belt",
@@ -150,14 +260,14 @@ export class ProductionView {
       0,
       0,
       0,
-      0.48,
-      0.48,
-      0.12,
+      0.72,
+      0.72,
+      0.14,
       palette.stoneLight,
       16,
     );
     this.saw.rotation.x = Math.PI / 2;
-    this.saw.position.copyFrom(worldPoint(sawPoint.x, sawPoint.y, 1.2));
+    this.saw.position.copyFrom(worldPoint(sawPoint.x, sawPoint.y + 6, 1.25));
     for (let i = 0; i < 10; i++) {
       const tooth = art.box(
         "saw-tooth",
@@ -170,9 +280,9 @@ export class ProductionView {
         palette.cream,
       );
       tooth.position.set(
-        Math.sin((i * Math.PI) / 5) * 0.49,
+        Math.sin((i * Math.PI) / 5) * 0.72,
         0,
-        Math.cos((i * Math.PI) / 5) * 0.49,
+        Math.cos((i * Math.PI) / 5) * 0.72,
       );
       tooth.parent = this.saw;
     }
@@ -184,7 +294,25 @@ export class ProductionView {
     f.age = 0;
     f.from.copyFrom(worldPoint(e.x, e.y, e.height ?? 1));
     f.to.copyFrom(worldPoint(e.toX!, e.toY!, e.toHeight ?? 0.75));
-    f.life = e.kind === "coin" ? 0.5 : 0.38;
+    // Match visible packed stock tiers; simulation quantity is unchanged.
+    for (const pile of this.piles) {
+      const at = (x: number, y: number) =>
+        Math.hypot(x - pile.at.x, y - pile.at.y) < 2;
+      const index = this.piles.indexOf(pile);
+      const count = [
+        this.game.investments.production.input,
+        this.game.investments.production.output,
+        this.game.investments.economy.stock,
+        this.game.investments.production.uncollected,
+      ][index];
+      const height =
+        1.1 +
+        Math.floor(Math.min(99, count) / 16) *
+          (pile.kind === "wood" ? 0.6 : 0.23);
+      if (at(e.x, e.y)) f.from.y = height;
+      if (at(e.toX!, e.toY!)) f.to.y = height;
+    }
+    f.life = e.kind === "coin" ? 0.9 : 0.55;
     f.mesh.setEnabled(true);
   }
   update(
@@ -227,8 +355,7 @@ export class ProductionView {
       this.slats[i].position.x =
         ((((i * 0.2 - time * 0.8) % 2.4) + 2.4) % 2.4) - 1.2;
     this.workpiece.setEnabled(
-      p.conveyor &&
-        !!p.processing &&
+      !!p.processing &&
         Math.hypot(
           this.game.player.x - sawPoint.x,
           this.game.player.y - sawPoint.y,
@@ -239,10 +366,20 @@ export class ProductionView {
       worldPoint(
         inputPoint.x + (sawPoint.x - inputPoint.x) * beltPhase,
         inputPoint.y,
-        0.87,
+        1.12,
       ),
     );
-    this.workpiece.rotation.y = Math.PI / 2;
+    this.workpiece.rotation.y = 0;
+    this.workpiece.scaling.setAll(1.6);
+    this.finishedPiece.setEnabled(!!p.processing && beltPhase > 0.45);
+    this.finishedPiece.position.copyFrom(
+      worldPoint(
+        sawPoint.x +
+          (outputPoint.x - sawPoint.x) * Math.max(0, (beltPhase - 0.45) / 0.55),
+        sawPoint.y,
+        1.08,
+      ),
+    );
     if (p.processing) this.saw.rotate(Vector3.Up(), dt * 12, 0);
     this.saw.scaling.setAll(p.processing ? 1 + Math.sin(time * 28) * 0.05 : 1);
     for (const f of this.flights) {
@@ -255,7 +392,7 @@ export class ProductionView {
       Vector3.LerpToRef(f.from, f.to, t, f.mesh.position);
       f.mesh.position.y += Math.sin(t * Math.PI) * 0.9;
       f.mesh.rotation.y = t * 1.8;
-      f.mesh.scaling.setAll(f.kind === "coin" ? 0.85 : 1.15);
+      f.mesh.scaling.setAll(f.kind === "coin" ? 1.6 : 1.5);
     }
   }
   metrics() {
