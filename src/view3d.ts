@@ -200,16 +200,16 @@ export class WorldView {
       new Vector3(-0.2, 1, 0.1),
       this.scene,
     );
-    sky.intensity = 0.9;
+    sky.intensity = 0.88;
     sky.diffuse = new Color3(0.94, 1, 0.96);
-    sky.groundColor = new Color3(0.62, 0.72, 0.64);
+    sky.groundColor = new Color3(0.76, 0.82, 0.76);
     sky.specular = Color3.Black();
     this.sun = new DirectionalLight(
       "afternoon-sun",
-      new Vector3(0.35, -1, 0.4),
+      new Vector3(0.45, -1, 0.28),
       this.scene,
     );
-    this.sun.intensity = 0.68;
+    this.sun.intensity = 0.52;
     this.sun.diffuse = new Color3(1, 0.94, 0.79);
     this.sun.specular = Color3.Black();
     this.sun.shadowMinZ = 1;
@@ -217,12 +217,12 @@ export class WorldView {
     this.sun.shadowFrustumSize = 30;
     this.shadows = new ShadowGenerator(512, this.sun);
     this.shadows.useBlurExponentialShadowMap = true;
-    this.shadows.blurKernel = 12;
+    this.shadows.blurKernel = 20;
     this.shadows.blurScale = 2;
     this.shadows.depthScale = 20;
     this.shadows.bias = 0.001;
     this.shadows.normalBias = 0.025;
-    this.shadows.setDarkness(0.18);
+    this.shadows.setDarkness(0.24);
     this.art = new Art(this.scene);
     this.guideRing = MeshBuilder.CreateTorus(
       "next-action",
@@ -246,7 +246,7 @@ export class WorldView {
     this.rig.root.rotation.y = Math.PI;
     this.playerRing = MeshBuilder.CreateTorus(
       "keeper-foot-ring",
-      { diameter: 1.28, thickness: 0.045, tessellation: 32 },
+      { diameter: 1.45, thickness: 0.075, tessellation: 32 },
       this.scene,
     );
     this.art.tint(this.playerRing, 0xffe5a1);

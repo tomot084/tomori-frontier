@@ -111,3 +111,14 @@ files and screenshots stay outside published artifacts.
 The runtime character URL carries `v=be37133ee215` (the published GLB SHA-256
 prefix), so the 10-minute Pages/browser cache cannot reuse the former Ranger
 for the new rig loader. When replacing the GLB, update this revision too.
+
+## Unified toy art pass (2026-10-07)
+
+The active grove now uses original code-built broadleaf geometry for both
+harvestable and decorative trees. The historical Kenney JSON is retained as a
+source record but is no longer imported or bundled. The KayKit Rogue GLB and
+animations are unchanged; its embedded texture is rendered with the same matte
+diffuse material family as props, with role-colored cloth and a larger head.
+Timber, machinery, buildings and bridges share bounded rounded-edge geometry
+and clean vertex colors without random triangle tint. No reference-image
+geometry, characters, textures, buildings or UI were copied.

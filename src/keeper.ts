@@ -15,7 +15,7 @@ export class Keeper {
   private clips = new Map<string, AnimationGroup>();
   body!: Mesh;
   private grip!: ReturnType<Art["player"]>["toolPivot"];
-  async load(art: Art, rig: ReturnType<Art["player"]>, roleColor = 0x46b5b1) {
+  async load(art: Art, rig: ReturnType<Art["player"]>, roleColor = 0x27c5bc) {
     const container = await (Keeper.container ??= LoadAssetContainerAsync(
       import.meta.env.BASE_URL + "models/keeper.glb?v=be37133ee215",
       art.scene,
@@ -48,25 +48,27 @@ export class Keeper {
       mesh.isPickable = false;
       mesh.receiveShadows = true;
       const source = mesh.material as PBRMaterial;
-      source.metallic = 0;
-      source.roughness = 1;
-      source.albedoColor = Color3.White();
-      source.unlit = false;
-      source.albedoColor = new Color3(1.22, 1.25, 1.18);
-      source.environmentIntensity = 0.25;
-      source.backFaceCulling = false;
-      source.emissiveColor = Color3.Black();
+      // Match procedural props: matte diffuse, restrained warm fill, no PBR
+      // exposure mismatch. Preserve the embedded KayKit skin/hair texture.
+      const paint = new StandardMaterial("tomori-character-paint", art.scene);
+      paint.diffuseTexture = source.albedoTexture;
+      paint.diffuseColor = new Color3(1.12, 1.1, 1.06);
+      paint.emissiveTexture = source.albedoTexture;
+      paint.emissiveColor = new Color3(0.24, 0.24, 0.24);
+      if (paint.diffuseTexture) paint.diffuseTexture.gammaSpace = true;
+      paint.specularColor = Color3.Black();
+      paint.backFaceCulling = false;
       if (mesh.name === "Rogue_Cape" || mesh.name === "Rogue_Body") {
-        const cloth = new StandardMaterial("tomori-hood", art.scene);
-        cloth.diffuseColor = Color3.FromInts(
+        paint.diffuseTexture = null;
+        paint.emissiveTexture = null;
+        paint.emissiveColor = new Color3(0.025, 0.045, 0.04);
+        paint.diffuseColor = Color3.FromInts(
           roleColor >> 16,
           (roleColor >> 8) & 255,
           roleColor & 255,
         );
-        cloth.specularColor = Color3.Black();
-        cloth.backFaceCulling = false;
-        mesh.material = cloth;
       }
+      mesh.material = paint;
       if (!this.body || mesh.getTotalVertices() > this.body.getTotalVertices())
         this.body = mesh;
     }
@@ -113,7 +115,7 @@ export class Keeper {
     const head = assetRoot.getDescendants().find((n) => n.name === "head")!;
     (
       head as import("@babylonjs/core/Meshes/transformNode").TransformNode
-    ).scaling.scaleInPlace(1.08);
+    ).scaling.scaleInPlace(1.14);
     for (const side of [-1, 1]) {
       const eye = art.sphere(
         "keeper-eye",

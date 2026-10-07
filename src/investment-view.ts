@@ -198,7 +198,7 @@ export class InvestmentView {
         );
       } else if (tile.id === "market") {
         parts.push(
-          art.box("market-counter", 0, 0.6, 0.7, 1.8, 0.85, 0.7, palette.wood),
+          art.box("market-counter", 0, 0.6, 0.7, 2.15, 1.0, 0.9, palette.wood),
         );
         for (const x of [-0.85, 0.85])
           parts.push(
@@ -207,9 +207,9 @@ export class InvestmentView {
               x,
               1.12,
               0.7,
-              0.12,
+              0.22,
               2.8,
-              0.12,
+              0.22,
               palette.leather,
             ),
           );
@@ -241,7 +241,7 @@ export class InvestmentView {
       } else if (tile.id === "sawmill") {
         // Feed funnel on the right; narrow pale lumber exits on the left.
         parts.push(
-          art.box("machine-bed", 0, 0.86, 0, 3.3, 0.28, 1.1, palette.ink),
+          art.box("machine-bed", 0, 0.86, 0, 3.65, 0.38, 1.35, palette.ink),
         );
         for (const x of [-1.35, 1.35])
           for (const z of [-0.42, 0.42])
@@ -251,15 +251,24 @@ export class InvestmentView {
                 x,
                 0.43,
                 z,
-                0.22,
+                0.34,
                 0.86,
-                0.22,
+                0.34,
                 palette.teal,
               ),
             );
         for (const z of [-0.65, 0.65]) {
           parts.push(
-            art.box("feed-funnel", 1.12, 1.13, z, 1.2, 0.3, 0.18, palette.teal),
+            art.box(
+              "feed-funnel",
+              1.12,
+              1.13,
+              z,
+              1.35,
+              0.43,
+              0.25,
+              palette.teal,
+            ),
           );
           parts.push(
             art.box(
@@ -281,14 +290,14 @@ export class InvestmentView {
               x,
               1.63,
               0.48,
-              0.18,
+              0.28,
               1.5,
-              0.18,
+              0.28,
               palette.teal,
             ),
           );
         parts.push(
-          art.box("saw-guard-arch", 0, 2.4, 0.4, 1.5, 0.25, 0.5, palette.teal),
+          art.box("saw-guard-arch", 0, 2.4, 0.4, 1.7, 0.36, 0.58, palette.teal),
         );
         parts.push(
           art.box("guard-light", 0, 2.43, 0.12, 0.55, 0.12, 0.06, palette.gold),
@@ -430,14 +439,14 @@ export class InvestmentView {
         );
       }
       if (tile.id === "market") {
-        for (let i = 0; i < 7; i++)
+        for (let i = 0; i < 5; i++)
           parts.push(
             art.box(
               "awning-stripe",
-              (i - 3) * 0.42,
+              (i - 2) * 0.6,
               2.78,
               0.6,
-              0.21,
+              0.3,
               0.04,
               1.55,
               palette.cream,
@@ -470,6 +479,7 @@ export class InvestmentView {
       );
       parts.push(purchaseSeal);
       const base = art.merge(`investment-${tile.id}`, parts);
+      if (tile.id === "sawmill") base.scaling.set(1.06, 1.1, 1.06);
       base.position.copyFrom(worldPoint(tile.x, tile.y));
       this.bases.push(base);
       shadows.addShadowCaster(base);

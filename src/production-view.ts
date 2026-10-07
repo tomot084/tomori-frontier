@@ -260,14 +260,14 @@ export class ProductionView {
       0,
       0,
       0,
-      0.72,
-      0.72,
-      0.14,
+      0.8,
+      0.8,
+      0.18,
       palette.stoneLight,
       16,
     );
     this.saw.rotation.x = Math.PI / 2;
-    this.saw.position.copyFrom(worldPoint(sawPoint.x, sawPoint.y + 6, 1.25));
+    this.saw.position.copyFrom(worldPoint(sawPoint.x, sawPoint.y + 6, 1.35));
     for (let i = 0; i < 10; i++) {
       const tooth = art.box(
         "saw-tooth",
@@ -280,9 +280,9 @@ export class ProductionView {
         palette.cream,
       );
       tooth.position.set(
-        Math.sin((i * Math.PI) / 5) * 0.72,
+        Math.sin((i * Math.PI) / 5) * 0.8,
         0,
-        Math.cos((i * Math.PI) / 5) * 0.72,
+        Math.cos((i * Math.PI) / 5) * 0.8,
       );
       tooth.parent = this.saw;
     }

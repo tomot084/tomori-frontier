@@ -1,5 +1,4 @@
-import natureMeshes from "./assets/nature-meshes.json";
-/** Tomori props and adapted CC0 Kenney vegetation. See docs/asset-sources.md. */
+/** Original Tomori props and unified toy grove. See docs/asset-sources.md. */
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
@@ -11,13 +10,13 @@ import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 export const palette = {
-  cream: 0xffe3a5,
-  teal: 0x257e82,
-  tealLight: 0x55afb0,
-  ink: 0x213e49,
+  cream: 0xffe5b1,
+  teal: 0x218e91,
+  tealLight: 0x63c4bb,
+  ink: 0x354f58,
   leather: 0xb26c3e,
-  wood: 0x75452f,
-  cut: 0xf0c588,
+  wood: 0x875237,
+  cut: 0xffd79b,
   leaf: 0x66ac69,
   leafLight: 0xa8d377,
   stone: 0x8babb4,
@@ -35,17 +34,17 @@ const noise = (n: number) => {
 export class Art {
   material: StandardMaterial;
   constructor(public scene: Scene) {
-    this.material = new StandardMaterial("painted-low-poly", scene);
+    this.material = new StandardMaterial("tomori-matte-paint", scene);
     this.material.diffuseColor = new Color3(1, 1, 1);
-    this.material.specularColor = new Color3(0.035, 0.035, 0.035);
+    this.material.specularColor = Color3.Black();
   }
   tint(mesh: Mesh, hex: number, facets = false) {
-    if (facets) mesh.convertToFlatShadedMesh();
+    // Broad, clean color fields; no random per-triangle tint.
     const c = color(hex),
       n = mesh.getTotalVertices(),
       colors: number[] = [];
     for (let i = 0; i < n; i++) {
-      const f = facets ? 0.91 + noise(Math.floor(i / 3) + hex) * 0.16 : 1;
+      const f = 1;
       colors.push(c.r * f, c.g * f, c.b * f, 1);
     }
     mesh.setVerticesData(VertexBuffer.ColorKind, colors);
@@ -64,11 +63,57 @@ export class Art {
     d: number,
     hex: number,
   ) {
-    const m = MeshBuilder.CreateBox(
-      name,
-      { width: w, height: h, depth: d },
-      this.scene,
-    );
+    // Shared rounded edges for timber, buildings and machinery. A fixed 4x4
+    // grid per face keeps this inexpensive and adds no scene objects.
+    const m = new Mesh(name, this.scene);
+    const half = [w / 2, h / 2, d / 2];
+    const radius = Math.min(0.13, Math.min(w, h, d) * 0.22);
+    const positions: number[] = [],
+      normals: number[] = [],
+      indices: number[] = [];
+    for (let axis = 0; axis < 3; axis++)
+      for (const sign of [-1, 1]) {
+        const u = (axis + 1) % 3,
+          v = (axis + 2) % 3;
+        const coords = (k: number) => [
+          -half[k],
+          -half[k] + radius,
+          half[k] - radius,
+          half[k],
+        ];
+        const base = positions.length / 3;
+        for (const cv of coords(v))
+          for (const cu of coords(u)) {
+            const point = [0, 0, 0];
+            point[axis] = sign * half[axis];
+            point[u] = cu;
+            point[v] = cv;
+            const core = point.map((n, k) =>
+              Math.max(-half[k] + radius, Math.min(half[k] - radius, n)),
+            );
+            const delta = point.map((n, k) => n - core[k]);
+            const length = Math.hypot(...delta);
+            positions.push(
+              ...core.map((n, k) => n + (delta[k] / length) * radius),
+            );
+            normals.push(...delta.map((n) => n / length));
+          }
+        for (let j = 0; j < 3; j++)
+          for (let i = 0; i < 3; i++) {
+            const q = base + j * 4 + i;
+            indices.push(
+              ...(sign < 0
+                ? [q, q + 1, q + 4, q + 1, q + 5, q + 4]
+                : [q, q + 4, q + 1, q + 1, q + 4, q + 5]),
+            );
+          }
+      }
+    const data = new VertexData();
+    data.positions = positions;
+    data.normals = normals;
+    data.indices = indices;
+    data.uvs = new Array((positions.length / 3) * 2).fill(0);
+    data.applyToMesh(m);
     m.position.set(x, y, z);
     return this.tint(m, hex);
   }
@@ -83,17 +128,11 @@ export class Art {
     hex: number,
     facets = false,
   ) {
-    const m = facets
-      ? MeshBuilder.CreateIcoSphere(
-          name,
-          { radius: 0.5, subdivisions: 1, flat: true },
-          this.scene,
-        )
-      : MeshBuilder.CreateIcoSphere(
-          name,
-          { radius: 0.5, subdivisions: 2, flat: false },
-          this.scene,
-        );
+    const m = MeshBuilder.CreateIcoSphere(
+      name,
+      { radius: 0.5, subdivisions: 2, flat: false },
+      this.scene,
+    );
     m.position.set(x, y, z);
     m.scaling.set(w, h, d);
     return this.tint(m, hex, facets);
@@ -115,12 +154,12 @@ export class Art {
         diameterTop: rt * 2,
         diameterBottom: rb * 2,
         height: h,
-        tessellation: sides,
+        tessellation: Math.max(12, sides),
       },
       this.scene,
     );
     m.position.set(x, y, z);
-    return this.tint(m, hex, true);
+    return this.tint(m, hex);
   }
   merge(name: string, parts: Mesh[]) {
     const m = Mesh.MergeMeshes(parts, true, true)!;
@@ -133,7 +172,7 @@ export class Art {
   rock(name: string, size = 1, hex = palette.stone, seed = 1) {
     const m = MeshBuilder.CreateIcoSphere(
       name,
-      { radius: 0.5, subdivisions: 1, flat: true },
+      { radius: 0.5, subdivisions: 2, flat: false },
       this.scene,
     );
     const p = m.getVerticesData(VertexBuffer.PositionKind)!;
@@ -147,10 +186,10 @@ export class Art {
     const normals: number[] = [];
     VertexData.ComputeNormals(p, m.getIndices()!, normals);
     m.setVerticesData(VertexBuffer.NormalKind, normals);
-    return this.tint(m, hex, true);
+    return this.tint(m, hex);
   }
   log(name: string) {
-    const body = this.cylinder(name, 0, 0, 0, 0.12, 0.14, 0.8, palette.wood, 8);
+    const body = this.cylinder(name, 0, 0, 0, 0.16, 0.18, 0.8, palette.wood, 8);
     body.rotation.z = Math.PI / 2;
     const ends = [-0.408, 0.408].map((x, i) => {
       const m = this.cylinder(
@@ -158,8 +197,8 @@ export class Art {
         x,
         0,
         0,
-        0.111,
-        0.111,
+        0.151,
+        0.151,
         0.013,
         palette.cut,
         8,
@@ -194,103 +233,57 @@ export class Art {
     return this.merge(name, [body, ...ends, ring, core]);
   }
   tree(seed: number, zone = 0, harvestable = true) {
-    if (harvestable) {
-      const parts: Mesh[] = [
-        this.cylinder(
-          "harvest-trunk",
-          0,
-          0.82,
-          0,
-          0.22,
-          0.34,
+    // One family of broad, rounded crowns for both harvest and scenery trees.
+    // Background uses the same silhouette with quieter colors and smaller scale.
+    const parts = [
+      this.cylinder(
+        "grove-trunk",
+        0,
+        0.8,
+        0,
+        0.28,
+        0.39,
+        1.6,
+        harvestable ? palette.wood : 0xa49a7e,
+        12,
+      ),
+    ];
+    const leaves = harvestable
+      ? [0x55b971, 0x7bc965, 0x63bc73]
+      : [0x88aa8d, 0x9ab68e, 0x8faf92];
+    for (let i = 0; i < 3; i++)
+      parts.push(
+        this.sphere(
+          "grove-crown",
+          (i - 1) * 0.54,
+          2.02 + (i === 1 ? 0.5 : 0),
+          i === 1 ? 0.1 : 0,
+          1.85,
           1.65,
-          palette.wood,
-          7,
+          1.7,
+          leaves[i],
         ),
-      ];
-      for (const side of [-1, 1]) {
-        const branch = this.cylinder(
-          "harvest-branch",
-          side * 0.28,
-          1.25,
-          0,
-          0.07,
-          0.12,
-          0.8,
-          palette.wood,
-          6,
-        );
-        branch.rotation.z = side * -0.65;
-        parts.push(branch);
-      }
-      for (let i = 0; i < 3; i++)
-        parts.push(
-          this.sphere(
-            "harvest-crown",
-            (i - 1) * 0.55,
-            2.08 + (i === 1 ? 0.48 : 0),
-            0,
-            1.5,
-            1.5,
-            1.45,
-            [0x49a65b, 0x81c75a, 0x61b44f][i],
-            true,
-          ),
-        );
+      );
+    if (harvestable)
       parts.push(
         this.box(
           "fresh-trunk-notch",
           0,
           0.55,
-          -0.27,
+          -0.35,
           0.32,
           0.12,
           0.09,
           palette.cut,
         ),
       );
-      return this.merge("harvestable-broadleaf-tree", parts);
-    }
-    const names = [
-      "tree_oak",
-      "tree_pineRoundD",
-      "tree_pineTallA_detailed",
-    ] as const;
-    const name = names[Math.abs(Math.floor(seed * 0.17)) % names.length];
-    const source = natureMeshes[name];
-    const mesh = new Mesh("lantern-grove-" + name, this.scene);
-    const data = new VertexData();
-    data.positions = source.positions.map((v, i) => {
-      const vertex = Math.floor(i / 3),
-        foliage =
-          source.colors[vertex * 4 + 1] > source.colors[vertex * 4] * 1.1;
-      return i % 3 === 1
-        ? foliage
-          ? v + 0.26
-          : v * 1.12
-        : v * (foliage ? 0.88 : 1.16);
-    });
-    data.normals = source.normals;
-    data.uvs = new Array((source.positions.length / 3) * 2).fill(0);
-    data.colors = source.colors.map((v, i) => {
-      if (i % 4 === 3) return v;
-      const base = i - (i % 4);
-      const grey =
-        (source.colors[base] +
-          source.colors[base + 1] +
-          source.colors[base + 2]) /
-        3;
-      return v * 0.42 + grey * 0.58;
-    });
-    data.indices = source.indices;
-    data.applyToMesh(mesh);
-    mesh.material = this.material;
-    mesh.isPickable = false;
-    mesh.receiveShadows = true;
-    mesh.rotation.y = noise(seed) * Math.PI * 2;
-    const scale = 0.88 + noise(seed + 9) * 0.2;
-    mesh.scaling.set(scale, scale, scale);
-    return this.merge("decorative-forest-tree", [mesh]);
+    const tree = this.merge(
+      harvestable ? "harvestable-broadleaf-tree" : "decorative-forest-tree",
+      parts,
+    );
+    tree.rotation.y = noise(seed) * Math.PI * 2;
+    if (!harvestable) tree.scaling.setAll(0.9 + noise(seed + zone) * 0.12);
+    return tree;
   }
 
   boulder(seed: number) {
@@ -520,7 +513,7 @@ export class Art {
       );
     for (const x of [-0.83, 0.83])
       p.push(
-        this.cylinder("tent-pole", x, 0.77, 0, 0.055, 0.055, 1.52, 0x9e744d, 6),
+        this.cylinder("tent-pole", x, 0.77, 0, 0.1, 0.1, 1.52, 0x9e744d, 6),
       );
     const roof = this.box(
       "sloping-canopy",
@@ -528,7 +521,7 @@ export class Art {
       1.11,
       0,
       1.3,
-      0.08,
+      0.18,
       2.03,
       0x3e8e8d,
     );
@@ -539,9 +532,9 @@ export class Art {
       1.11,
       0,
       1.3,
-      0.08,
+      0.18,
       2.03,
-      0x80b7a0,
+      0x56aaa3,
     );
     roof2.rotation.z = -0.62;
     p.push(roof, roof2);

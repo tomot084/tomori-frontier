@@ -42,7 +42,7 @@ function island(art: Art, zone: number, start: number, end: number) {
     const co = color(hex);
     for (let i = 0; i < 3; i++) colors.push(co.r, co.g, co.b, 1);
   }
-  const grass = [0xb6d390, 0x94c3ad, 0xc3c9a2][zone],
+  const grass = [0xbdd6a2, 0x94c3ad, 0xc3c9a2][zone],
     center = worldPoint(450, (start + end) / 2, 0.02);
   for (let i = 0; i < outline.length; i++) {
     const j = (i + 1) % outline.length;
@@ -158,16 +158,16 @@ export function makeScenery(art: Art) {
       { pathArray: pathEdges, sideOrientation: Mesh.DOUBLESIDE },
       art.scene,
     );
-    art.tint(path, 0xd7bb83);
+    art.tint(path, 0xddc69b);
     details.push(path);
     if (zone === 0) {
       // Forest behind camp fills the opening view, leaving the walking route clear.
-      for (let i = 0; i < 14; i++) {
+      for (let i = 0; i < 10; i++) {
         const tree = art.tree(90 + i, 0, false);
         tree.position.copyFrom(
           worldPoint(145 + (i % 7) * 100, 55 + Math.floor(i / 7) * 92),
         );
-        tree.scaling.setAll(1.05 + rand(i + 12) * 0.2);
+        tree.scaling.setAll(0.9 + rand(i + 12) * 0.15);
         tree.name = "border-tree-north-" + i;
         tree.freezeWorldMatrix();
         zones[0].push(tree);
@@ -175,7 +175,7 @@ export function makeScenery(art: Art) {
       }
     }
     // Understory clusters and border trees create a forest, while keeping the main route readable.
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 16; i++) {
       const side = i % 2;
       const x = side ? 775 + rand(i) * 32 : 95 + rand(i) * 40;
       const y = start + 40 + (Math.floor(i / 2) * (end - start - 80)) / 10;
@@ -186,7 +186,7 @@ export function makeScenery(art: Art) {
       tree.freezeWorldMatrix();
       zones[zone].push(tree);
     }
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 65; i++) {
       const x = 95 + rand(i + zone * 200) * 710,
         y = start + 32 + rand(i + 83 + zone * 70) * (end - start - 64);
       if (
