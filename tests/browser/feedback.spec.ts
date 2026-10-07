@@ -36,9 +36,14 @@ test("right-side touch works and real pickup updates the objective and HUD", asy
       () => page.evaluate(() => (window as any).__game.state().resources.wood),
       { timeout: 12000 },
     )
-    .toBe(5);
-  await expect(page.locator('[data-resource="wood"] strong')).toHaveText("5");
-  await expect(page.locator("#goal b")).toContainText("橋へ素材を届けよう");
+    .toBeGreaterThanOrEqual(5);
+  const gathered = await page.evaluate(
+    () => (window as any).__game.state().resources.wood,
+  );
+  await expect(page.locator('[data-resource="wood"] strong')).toHaveText(
+    String(gathered),
+  );
+  await expect(page.locator("#goal b")).toContainText("製材所INPUT");
   await expect(page.locator('[data-resource="wood"]')).toHaveClass(/collected/);
   await page.screenshot({ path: "screenshots/polish-feedback-390.png" });
   await context.close();

@@ -6,7 +6,8 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { VertexBuffer } from "@babylonjs/core/Buffers/buffer";
 import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import "@babylonjs/core/Meshes/thinInstanceMesh";
+import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import type { Scene } from "@babylonjs/core/scene";
 export const palette = {
@@ -202,7 +203,16 @@ export class Art {
     const source = natureMeshes[name];
     const mesh = new Mesh("lantern-grove-" + name, this.scene);
     const data = new VertexData();
-    data.positions = source.positions;
+    data.positions = source.positions.map((v, i) => {
+      const vertex = Math.floor(i / 3),
+        foliage =
+          source.colors[vertex * 4 + 1] > source.colors[vertex * 4] * 1.1;
+      return i % 3 === 1
+        ? foliage
+          ? v + 0.26
+          : v * 1.12
+        : v * (foliage ? 0.88 : 1.16);
+    });
     data.normals = source.normals;
     data.uvs = new Array((source.positions.length / 3) * 2).fill(0);
     data.colors = source.colors.map((v, i) => {
@@ -693,7 +703,7 @@ export class Art {
     m.material = this.material;
     return m;
   }
-  player() {
+  player(maxCargo = 100) {
     const root = new TransformNode("lantern-keeper", this.scene),
       torso = new TransformNode("torso-pivot", this.scene);
     torso.parent = root;
@@ -932,11 +942,18 @@ export class Art {
     const cargoRoot = new TransformNode("cargo-rack", this.scene);
     cargoRoot.parent = torso;
     cargoRoot.position.set(0, 1.12, -0.62);
-    const wood = Array.from({ length: 8 }, (_, i) => {
-        const m = this.log("carried-log-" + i);
-        m.scaling.x = 1.28;
+    const cargoSource = this.log("cargo-log-source");
+    cargoSource.setEnabled(false);
+    const wood = Array.from({ length: maxCargo }, (_, i) => {
+        const m = cargoSource.createInstance("carried-log-" + i);
+        m.scaling.x = 1.35;
         m.parent = cargoRoot;
-        m.position.set(((i % 2) - 0.5) * 0.15, i * 0.27, 0.1);
+        m.position.set(
+          ((i % 2) - 0.5) * 0.34,
+          Math.floor(i / 2) * 0.34,
+          Math.sin(i * 3) * 0.055,
+        );
+        m.rotation.y = Math.floor(i / 2) % 2 ? 0.12 : -0.12;
         m.setEnabled(false);
         return m;
       }),
@@ -947,6 +964,28 @@ export class Art {
         m.setEnabled(false);
         return m;
       });
+    const planks = this.box(
+      "carried-planks",
+      0,
+      0,
+      0,
+      1.05,
+      0.15,
+      0.35,
+      palette.cut,
+    );
+    planks.parent = cargoRoot;
+    const plankMatrices = new Float32Array(maxCargo * 16);
+    for (let i = 0; i < maxCargo; i++)
+      Matrix.Translation(
+        ((i % 2) - 0.5) * 0.4,
+        Math.floor(i / 2) * 0.24,
+        0.1,
+      ).copyToArray(plankMatrices, i * 16);
+    planks.thinInstanceSetBuffer("matrix", plankMatrices, 16, true);
+    planks.thinInstanceCount = 0;
+    planks.setEnabled(false);
+    planks.alwaysSelectAsActiveMesh = true;
     const food = this.resource("food", "berry-pouch");
     food.parent = cargoRoot;
     food.position.set(-0.39, -0.09, 0.1);
@@ -960,6 +999,7 @@ export class Art {
       toolPivot,
       tools,
       cargoRoot,
+      planks,
       wood,
       stone,
       food,

@@ -25,7 +25,9 @@ export class InvestmentView {
         art.box(`${tile.id}-foundation`, 0, 0.06, 0, 2.45, 0.12, 2.2, 0xe3d4a8),
       ];
       // Each investment has an original miniature prop, readable without a floating panel.
-      if (tile.id === "tool") {
+      if (["conveyor", "hauler", "sawyer"].includes(tile.id)) {
+        // Hiring pads remain flat so the production line and workers stay readable.
+      } else if (tile.id === "tool") {
         parts.push(
           art.box("workbench", 0, 0.55, 0.65, 1.5, 0.22, 0.65, palette.wood),
         );
@@ -213,7 +215,7 @@ export class InvestmentView {
       shadows.addShadowCaster(base);
       const plane = MeshBuilder.CreatePlane(
         `tile-${tile.id}`,
-        { width: 2.25, height: 2 },
+        { width: 1.85, height: 1.55 },
         art.scene,
       );
       plane.rotation.x = Math.PI / 2;
@@ -284,6 +286,9 @@ export class InvestmentView {
       this.game.investments.economy.waiter,
       this.game.investments.economy.market,
       this.game.investments.economy.perks,
+      this.game.investments.production.conveyor,
+      this.game.investments.production.hauler,
+      this.game.investments.production.sawyer,
     ]);
     if (key !== this.paintKey) {
       this.paintKey = key;
@@ -331,7 +336,7 @@ export class InvestmentView {
     this.waiter.root.rotation.y = w.heading;
     this.waiter.wood.setEnabled(w.cargo > 0);
     this.waiter.stone.setEnabled(false);
-    this.stock.setEnabled(this.game.investments.economy.stock > 0);
+    this.stock.setEnabled(false);
     this.stock.scaling.y =
       0.4 +
       (0.6 * this.game.investments.economy.stock) /

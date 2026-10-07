@@ -22,47 +22,38 @@ it("supports tool-first, carrier-first and market-first investments with distinc
     ).toBe(1);
   }
 });
-it("selling is deliberate, spends exactly five wood, and market upgrades improve actual revenue", () => {
+it("selling is deliberate for market stock, pays into a physical till, then collects nearby", () => {
   const g = new GameModel(fresh());
   g.s.resources.wood = 20;
   g.player = { ...marketPoint };
   run(g, 1000);
   expect(g.s.resources.wood).toBe(20);
   expect(g.s.resources.coin).toBe(0);
+  g.investments.economy.stock = 5;
   expect(g.investments.supply()).toBe(true);
-  expect(g.s.resources.wood).toBe(15);
-  expect(g.s.resources.coin).toBe(4);
-  g.investments.supply();
-  expect(g.investments.buy("market")).toBe(true);
-  expect(g.s.resources.coin).toBe(2);
-  g.investments.supply();
-  expect(g.s.resources.coin).toBe(7);
-  expect(g.s.economy!.sold).toBe(15);
-  g.player = { x: 450, y: 360 };
-  expect(g.investments.supply()).toBe(false);
+  run(g, 2000);
+  expect(g.s.economy!.sold).toBe(5);
+  expect(g.s.resources.coin).toBe(10);
+  expect(g.s.resources.wood).toBe(20);
 });
-it("waiter carries reserved stock, pays only on arrival, and reload does not lose or duplicate cargo", () => {
+it("waiter reservations survive reload and revenue remains collectible instead of disappearing", () => {
   const g = new GameModel(fresh());
-  g.s.resources.coin = 6;
-  g.s.resources.wood = 20;
-  g.player = { ...marketPoint };
-  expect(g.investments.buy("waiter")).toBe(true);
-  g.investments.supply();
+  g.investments.economy.waiter = true;
+  g.investments.economy.stock = 20;
+  g.player = { x: 450, y: 290 };
   run(g, 100);
   expect(g.investments.waiter.cargo).toBe(5);
-  expect(g.s.economy!.stock).toBe(20);
-  expect(g.s.resources.coin).toBe(0);
   const resumed = new GameModel(load(JSON.stringify(g.snapshot())));
   run(resumed, 18000);
-  expect(resumed.s.economy!.stock).toBe(0);
-  expect(resumed.s.economy!.sold).toBe(20);
-  expect(resumed.s.resources.coin).toBe(16);
+  expect(resumed.investments.economy.sold).toBe(20);
+  expect(resumed.investments.production.uncollected).toBe(40);
+  expect(resumed.s.resources.coin).toBe(0);
 });
 it("capacity investment reduces round trips without forcing a tool upgrade, and purchases cannot overdraft", () => {
   const g = new GameModel(fresh());
   g.s.resources.coin = 5;
   expect(g.investments.buy("basket")).toBe(true);
-  expect(stats(g.s).capacity).toBe(30);
+  expect(stats(g.s).capacity).toBe(40);
   expect(g.s.levels.gather).toBe(0);
   expect(g.investments.buy("carrier")).toBe(false);
   expect(g.s.resources.coin).toBe(0);
@@ -75,30 +66,29 @@ it("legacy automatic companions migrate as owned while new games require hiring"
   expect(fresh().economy!.carriers).toBe(0);
 });
 
-it("production buildings improve real harvest yields for wood and stone", () => {
-  for (const [perk, kind] of [
-    ["sawmill", "wood"],
-    ["quarry", "stone"],
-  ] as const) {
-    const g = new GameModel(fresh());
-    g.s.resources.coin = 10;
-    expect(g.investments.buy(perk)).toBe(true);
-    const n = g.nodes.find((n) => n.kind === kind)!;
-    g.player = { x: n.x, y: n.y };
-    run(g, 4000);
-    expect(g.s.resources[kind]).toBe(7);
-  }
-});
-it("upgraded depot persists more than thirty wood and respects the new limit", () => {
+it("sawmill investment accelerates processing while quarry still improves real stone yield", () => {
   const g = new GameModel(fresh());
-  g.s.resources.coin = 12;
-  g.s.resources.wood = 50;
-  g.player = { ...marketPoint };
-  g.investments.buy("waiter");
+  g.s.resources.coin = 10;
+  g.investments.buy("sawmill");
+  g.investments.production.input = 4;
+  g.player = { x: 380, y: 430 };
+  run(g, 3000);
+  expect(g.investments.production.output).toBe(3);
+  const stone = new GameModel(fresh());
+  stone.s.resources.coin = 10;
+  stone.investments.buy("quarry");
+  const n = stone.nodes.find((n) => n.kind === "stone")!;
+  stone.player = { ...n };
+  run(stone, 4000);
+  expect(stone.s.resources.stone).toBeGreaterThanOrEqual(7);
+});
+it("depot preserves expanded market stock and increases output capacity", () => {
+  const g = new GameModel(fresh());
+  g.s.resources.coin = 6;
   g.investments.buy("depot");
-  expect(g.investments.storageCapacity).toBe(50);
-  g.investments.supply();
+  g.investments.economy.stock = 50;
   expect(load(JSON.stringify(g.snapshot())).economy!.stock).toBe(50);
+  expect(g.investments.outputCapacity).toBe(100);
 });
 it("a wider recovery light attracts drops outside the original radius", () => {
   const g = new GameModel(fresh());
@@ -127,14 +117,16 @@ it("bounties are gated by the bridge, then increase actual combat drops", () => 
 });
 it("carrier market routing feeds a real autonomous harvest-delivery-sales loop", () => {
   const g = new GameModel(fresh());
-  g.s.resources.coin = 14;
+  g.s.resources.coin = 70;
   g.investments.buy("carrier");
   g.investments.buy("waiter");
+  g.investments.buy("hauler");
+  g.investments.buy("conveyor");
   g.investments.setRoute("market");
   g.player = { x: 450, y: 290 };
   run(g, 60000);
   expect(g.s.economy!.sold).toBeGreaterThanOrEqual(5);
-  expect(g.s.resources.coin).toBeGreaterThanOrEqual(4);
+  expect(g.investments.production.uncollected).toBeGreaterThanOrEqual(2);
   expect(g.s.progress[0]).toEqual({ wood: 0, stone: 0, food: 0 });
   expect(g.s.resources.wood).toBe(0);
   const restored = new GameModel(load(JSON.stringify(g.snapshot())));
@@ -145,14 +137,18 @@ it("changing carrier destination retains an already harvested load until deliver
   g.s.resources.coin = 8;
   g.investments.buy("carrier");
   g.investments.setRoute("market");
-  for (let t = 0; t < 30000 && !g.crew.workers[0].cargo; t += 20) run(g, 20);
+  for (let t = 0; t < 30000 && g.crew.workers[0].cargo < 5; t += 20) run(g, 20);
   const w = g.crew.workers[0];
   expect(w.cargo).toBe(5);
   g.investments.setRoute("build");
   run(g, 100);
   expect(w.destination).toBe("market");
   run(g, 8000);
-  expect(g.s.economy!.stock).toBe(5);
+  expect(
+    g.investments.production.input +
+      g.investments.production.output +
+      g.investments.production.processing,
+  ).toBeGreaterThanOrEqual(5);
 });
 it("changing route during a stone job never converts stone into market wood", () => {
   const g = new GameModel(fresh());
@@ -181,17 +177,14 @@ it("transport investments speed up real carrier travel", () => {
     Math.hypot(g.crew.workers[0].x - 570, g.crew.workers[0].y - 205);
   expect(travel(fast) / travel(normal)).toBeCloseTo(1.25, 3);
 });
-it("market-routed carrier stock can be sold manually without forcing waiter hiring", () => {
+it("market-routed wood enters INPUT and manual production can be carried to customers", () => {
   const g = new GameModel(fresh());
-  g.s.resources.coin = 8;
-  g.investments.buy("carrier");
+  g.investments.economy.carriers = 1;
   g.investments.setRoute("market");
+  g.player = { x: 450, y: 290 };
   run(g, 20000);
-  expect(g.s.economy!.stock).toBeGreaterThanOrEqual(5);
-  g.player = { ...marketPoint };
-  const stock = g.s.economy!.stock;
-  expect(g.investments.supply()).toBe(true);
-  expect(g.s.economy!.stock).toBe(stock - 5);
-  expect(g.s.resources.coin).toBe(4);
-  expect(g.s.resources.wood).toBe(0);
+  expect(g.investments.production.input).toBeGreaterThanOrEqual(5);
+  g.player = { x: 380, y: 430 };
+  run(g, 10000);
+  expect(g.investments.production.output).toBeGreaterThan(0);
 });

@@ -99,6 +99,7 @@ export class GameUI {
         this.closeInvestments();
         this.toast(`${tile.name}へ。光る目印をたどろう`);
       } else if (model.investments.buy(id)) {
+        this.closeInvestments();
         model.investments.focus = null;
         this.toast(`${tile.name}に投資した！`);
         this.investmentKey = "";
@@ -111,6 +112,7 @@ export class GameUI {
         model.investments.supply()
       ) {
         this.investmentKey = "";
+        this.closeInvestments();
         this.update(true);
       }
     };
@@ -170,16 +172,23 @@ export class GameUI {
       economy = system.economy;
     const nearest = system.nearest;
     el("invest-toggle").hidden = !started || this.investmentOpen;
-    el("tile-action").hidden = !started || this.investmentOpen || !nearest;
+    el("tile-action").hidden =
+      !started ||
+      this.investmentOpen ||
+      !nearest ||
+      (!s.resources.coin &&
+        nearest.id !== "sawmill" &&
+        nearest.id !== "market");
     if (nearest)
       el("tile-action").innerHTML =
-        `<b>${nearest.name}</b><small>${nearest.id === "market" ? "木を売る / 売上を強化" : "費用・効果を見る"} ↗</small>`;
+        `<b>${nearest.name}</b><small>${nearest.id === "market" ? "板材を売る / 灯貨を回収" : "費用・効果を見る"} ↗</small>`;
     el("invest-return").hidden = !system.focus;
     const investmentKey = JSON.stringify([
       economy,
       s.levels,
       s.resources,
       nearest?.id,
+      system.production,
       this.selectedInvestment,
       this.investmentFilter,
     ]);
@@ -188,6 +197,9 @@ export class GameUI {
       const catalog = [...investmentTiles].sort(
         (a, b) =>
           [
+            "conveyor",
+            "hauler",
+            "sawyer",
             "tool",
             "sawmill",
             "carrier",
@@ -201,6 +213,9 @@ export class GameUI {
             "bounty",
           ].indexOf(a.id) -
           [
+            "conveyor",
+            "hauler",
+            "sawyer",
             "tool",
             "sawmill",
             "carrier",
@@ -230,7 +245,7 @@ export class GameUI {
         .join("");
       el("crew-routing").innerHTML =
         this.selectedInvestment === "carrier" && economy.carriers > 0
-          ? `<div class="market-card"><b>運搬精霊の届け先</b><p>建築を進めるか、市場に木を集めるか。進行中の仕事を届け終えてから切り替えます。</p><div class="route-options"><button data-route="build" aria-pressed="${economy.route !== "market"}">建築へ</button><button data-route="market" aria-pressed="${economy.route === "market"}">市場へ</button></div>${economy.route === "market" && !economy.waiter ? "<p>配達係を雇うと、集めた木を自動で販売できます。</p>" : ""}</div>`
+          ? `<div class="market-card"><b>木こりの届け先</b><p>建築を進めるか、製材所に丸太を集めるか。進行中の仕事を届け終えてから切り替えます。</p><div class="route-options"><button data-route="build" aria-pressed="${economy.route !== "market"}">建築へ</button><button data-route="market" aria-pressed="${economy.route === "market"}">市場へ</button></div>${economy.route === "market" && !economy.waiter ? "<p>運搬係と販売係を雇うと、板材を市場へ運んで販売できます。</p>" : ""}</div>`
           : "";
       el("investment-options").innerHTML = items
         .map((t) => {
@@ -240,7 +255,7 @@ export class GameUI {
               100;
           const max = o.level >= o.max,
             locked = s.zone < o.unlock;
-          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}体` : t.id === "waiter" ? (o.level ? "雇用済" : "未雇用") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${locked || max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${locked ? `✦ ${o.price}<small>橋の完成で解放</small>` : max ? "MAX" : nearby ? `✦ ${o.price} で${t.id === "carrier" || t.id === "waiter" ? "雇う" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
+          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}人` : ["waiter", "hauler", "sawyer"].includes(t.id) ? (o.level ? "雇用済" : "未雇用") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${locked || max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${locked ? `✦ ${o.price}<small>橋の完成で解放</small>` : max ? "MAX" : nearby ? `✦ ${o.price} で${["carrier", "waiter", "hauler", "sawyer"].includes(t.id) ? "雇う" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
         })
         .join("");
       const atMarket =
@@ -248,12 +263,16 @@ export class GameUI {
           this.model.player.x - marketPoint.x,
           this.model.player.y - marketPoint.y,
         ) < 100;
+      const p = system.production;
       el("market-action").innerHTML =
         this.selectedInvestment === "market"
-          ? `<div class="market-card"><b>木5 → ✦ ${4 + economy.market}<span>販売済 ${economy.sold}個</span></b><p>${economy.waiter ? `預かり木 ${economy.stock} / ${system.storageCapacity} · 配達係が5個ずつお届け` : economy.stock > 0 ? `預かり木 ${economy.stock} / ${system.storageCapacity} · 木5個ずつ手売りできます` : "建築に使うか、売って投資するか。木材の使い道は自由。"}</p><button id="market-supply" ${!atMarket || (economy.waiter ? s.resources.wood < 1 : s.resources.wood < 5 && economy.stock < 5) || (economy.waiter && economy.stock >= system.storageCapacity) ? "disabled" : ""}>${atMarket ? (economy.waiter ? "持っている木を預ける" : economy.stock >= 5 ? "預かり木5を売る" : "木5を売る") : "市場タイルで木を売れます"}</button></div>`
-          : "";
+          ? `<div class="market-card"><b>板材1 → ✦ ${2 + economy.market}<span>販売済 ${economy.sold}枚</span></b><p>製材所のOUTPUTで板材を拾って市場へ。市場に立つと1枚ずつ販売。金庫へ近づいて灯貨を回収。</p><p>運ぶ板材 ${p.carried} · 市場在庫 ${economy.stock} · 未回収 ✦ ${p.uncollected}</p><button id="market-supply" ${!atMarket || (!p.carried && !economy.stock) ? "disabled" : ""}>市場の板材を販売する</button></div>`
+          : this.selectedInvestment === "sawmill"
+            ? `<div class="market-card"><b>丸太 → 板材 → 灯貨</b><p>右のINPUTへ近づくと1本ずつ投入。最初は製材所のそばで作業し、左のOUTPUTから板材を運びます。</p><p>INPUT ${p.input} · 製材中 ${p.processing} · OUTPUT ${p.output} / ${system.outputCapacity}</p></div>`
+            : "";
     }
-    const key = JSON.stringify(s.resources) + st.capacity;
+    const key =
+      JSON.stringify(s.resources) + st.capacity + system.production.carried;
     if (key !== this.lastResources) {
       if (!el("resources").children.length)
         el("resources").innerHTML = (
@@ -282,6 +301,9 @@ export class GameUI {
                 : st.capacity;
           chip.querySelector("strong")!.textContent = String(s.resources[r]);
           chip.classList.toggle("full", !!cap && s.resources[r] >= cap);
+          if (r === "wood")
+            chip.querySelector("small")!.innerHTML =
+              `丸太<span>/${st.capacity}</span> 板${system.production.carried}`;
           const capLabel = chip.querySelector("small span");
           if (capLabel) capLabel.textContent = `/ ${cap}`;
         }
@@ -306,6 +328,9 @@ export class GameUI {
       system.focus,
       economy.carriers,
       economy.route,
+      system.production.input,
+      system.production.output,
+      system.production.carried,
       Math.round(this.model.player.x / 30),
       Math.round(this.model.player.y / 30),
     ]);
@@ -330,11 +355,29 @@ export class GameUI {
         const building = guide.kind === "build";
         const focused = investmentTiles.find((t) => t.id === system.focus);
         const title = building
-          ? "橋へ素材を届けよう"
+          ? s.zone === 0 &&
+            economy.sold < 5 &&
+            guide.target.x === 465 &&
+            guide.target.y === 430
+            ? "製材所INPUTへ丸太を届けよう"
+            : "橋へ素材を届けよう"
           : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;
         el("goal").innerHTML =
-          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${economy.carriers > 0 ? ` · ${economy.route === "market" ? "市場" : "建築"}担当${economy.carriers}体` : " · 市場で木を売って投資もできる"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
+          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${economy.carriers > 0 ? ` · ${economy.route === "market" ? "市場" : "建築"}担当${economy.carriers}人` : " · 市場で木を売って投資もできる"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
       }
+    }
+    const line = system.production;
+    if (
+      !system.focus &&
+      s.zone === 0 &&
+      (line.carried ||
+        line.input ||
+        line.output ||
+        line.processing ||
+        s.resources.wood >= 10)
+    ) {
+      el("goal").innerHTML =
+        `<b>${line.uncollected ? "市場の金庫へ → 灯貨を回収" : line.carried ? "板材を市場へ → 灯貨を回収" : line.output ? "OUTPUTの板材を拾って市場へ" : line.input || line.processing ? "丸太 → 製材 → 板材" : "丸太を製材所INPUTへ運ぼう"}</b><small>INPUT ${line.input} · OUTPUT ${line.output} · 運ぶ板材 ${line.carried} · 未回収 ✦ ${line.uncollected}</small>`;
     }
     const ready =
       s.levels.gather === 0 && s.resources.coin >= cost(s, "gather");

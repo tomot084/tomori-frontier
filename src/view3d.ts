@@ -1,3 +1,4 @@
+import { ProductionView } from "./production-view";
 import { InvestmentView } from "./investment-view";
 import { customerPoint } from "./investments";
 import { Keeper } from "./keeper";
@@ -14,6 +15,7 @@ import "@babylonjs/core/Lights/Shadows/shadowGeneratorSceneComponent";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Art, color, palette, worldPoint } from "./models";
@@ -41,12 +43,36 @@ interface Fragment {
   life: number;
 }
 export class WorldView {
+  production!: ProductionView;
   investments!: InvestmentView;
   customerLabel!: HTMLElement;
   keeper = new Keeper();
+  people: {
+    rig: ReturnType<Art["player"]>;
+    keeper: Keeper;
+    role: string;
+    id: number;
+  }[] = [];
   async loadAssets() {
     await this.keeper.load(this.art, this.rig);
     this.actors.get("player")!.mesh = this.rig.body;
+    this.investments = new InvestmentView(this.art, this.model, this.shadows);
+    for (const [role, id, tint] of [
+      ["crew", 0, 0xd69857],
+      ["crew", 1, 0x99b87c],
+      ["waiter", 0, 0xf5d779],
+      ["hauler", 0, 0x83b7ce],
+      ["sawyer", 0, 0xd9805d],
+      ["customer", 0, 0xbbadce],
+      ["customer", 1, 0xb4c69d],
+    ] as [string, number, number][]) {
+      const rig = this.art.player(8),
+        keeper = new Keeper();
+      rig.root.scaling.setAll(role === "customer" ? 0.82 : 1);
+      await keeper.load(this.art, rig, tint);
+      rig.root.setEnabled(false);
+      this.people.push({ rig, keeper, role, id });
+    }
     this.scene.render();
   }
   engine: Engine;
@@ -58,7 +84,9 @@ export class WorldView {
   rig: ReturnType<Art["player"]>;
   scenery: ReturnType<typeof makeScenery>;
   actors = new Map<string, Actor>();
-  dropMeshes = new Map<string, Mesh>();
+  dropMeshes = new Map<string, AbstractMesh>();
+  dropPools: Record<string, AbstractMesh[]> = {};
+  dropSources: Record<string, Mesh> = {};
   crewRigs: (ReturnType<Art["helper"]> & { shadow: Mesh })[] = [];
   enemyBars = new Map<string, HTMLElement>();
   dangerRings = new Map<string, Mesh>();
@@ -160,6 +188,7 @@ export class WorldView {
     overlay.append(this.guideLabel);
     this.shadowMaterial = this.makeShadowMaterial();
     this.scenery = makeScenery(this.art);
+    this.production = new ProductionView(this.art, model, overlay);
     this.rig = this.art.player();
     this.rig.root.scaling.setAll(1.25);
     this.rig.root.rotation.y = Math.PI;
@@ -334,7 +363,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 7.8 : 8;
+    const halfHeight = ratio < 0.8 ? 7.3 : 8;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -411,6 +440,7 @@ export class WorldView {
     return v;
   }
   effects(event: GameEvent) {
+    this.production.event(event);
     if (event.type === "pickup") {
       this.cargoBounceAt = this.time;
       const key = event.kind!;
@@ -597,15 +627,24 @@ export class WorldView {
   }
   syncCargo() {
     const s = this.model.s,
-      key = `${s.resources.wood},${s.resources.stone},${s.resources.food}`;
+      key = `${s.resources.wood},${s.resources.stone},${s.resources.food},${this.model.investments.production.carried}`;
     if (key === this.lastInventory) return;
     this.lastInventory = key;
-    const wood = Math.min(8, s.resources.wood),
+    const wood = Math.min(100, s.resources.wood),
       stone = Math.min(4, Math.ceil(s.resources.stone / 2));
     this.rig.wood.forEach((m, i) => m.setEnabled(i < wood));
+    this.rig.planks.thinInstanceCount = Math.min(
+      100,
+      this.model.investments.production.carried,
+    );
+    this.rig.planks.position.y = Math.ceil(wood / 2) * 0.34;
+    this.rig.planks.setEnabled(this.model.investments.production.carried > 0);
     this.rig.stone.forEach((m, i) => {
       m.setEnabled(i < stone);
-      m.position.y = wood * 0.32 + Math.floor(i / 2) * 0.29;
+      m.position.y =
+        Math.ceil(wood / 2) * 0.34 +
+        Math.ceil(this.model.investments.production.carried / 2) * 0.24 +
+        Math.floor(i / 2) * 0.29;
     });
     this.rig.food.setEnabled(s.resources.food > 0);
   }
@@ -639,6 +678,9 @@ export class WorldView {
     this.time += dt;
     const m = this.model;
     this.syncCargo();
+    this.production.update(dt, this.time, (el, at, visible) =>
+      this.place(el, at, visible),
+    );
     for (const [kind, batch] of this.pickupBatches)
       if (this.time - batch.at > 0.22) {
         this.float({
@@ -662,7 +704,13 @@ export class WorldView {
     this.guideRing.scaling.setAll(1 + Math.sin(this.time * 4) * 0.055);
     this.guideLabel.textContent =
       guide.kind === "build"
-        ? "ここへ届ける"
+        ? guide.target.x === 465
+          ? "INPUT 投入"
+          : guide.target.x === 295
+            ? "OUTPUT 拾う"
+            : guide.target.x === 650
+              ? "灯貨を回収"
+              : "ここへ届ける"
         : guide.kind === "done"
           ? ""
           : `${resourceData[guide.kind].name}を集める`;
@@ -687,7 +735,18 @@ export class WorldView {
     this.playerRing.position.copyFrom(p.root.position);
     this.playerRing.position.y = 0.065;
     const cargoAge = this.time - this.cargoBounceAt;
-    this.rig.cargoRoot.rotation.z = Math.sin(this.time * 9) * m.moving * 0.025;
+    this.rig.cargoRoot.rotation.z = Math.sin(this.time * 6) * m.moving * 0.025;
+    for (
+      let i = 0;
+      i < Math.min(100, m.s.resources.wood + m.investments.production.carried);
+      i++
+    )
+      this.rig.wood[i].position.x =
+        ((i % 2) - 0.5) * 0.34 +
+        Math.sin(this.time * 6 - i * 0.12) *
+          m.moving *
+          Math.floor(i / 2) *
+          0.009;
     this.rig.cargoRoot.position.y =
       1.12 +
       (cargoAge < 0.32 ? Math.sin((cargoAge / 0.32) * Math.PI) * 0.13 : 0);
@@ -706,20 +765,34 @@ export class WorldView {
     this.rig.torso.position.y = Math.abs(walk) * 0.045;
     this.rig.torso.rotation.z = walk * 0.028;
     if (phase >= 0 && phase < 1) {
-      p.root.rotation.y = this.swing.yaw;
+      p.root.rotation.y +=
+        Math.atan2(
+          Math.sin(this.swing.yaw - p.root.rotation.y),
+          Math.cos(this.swing.yaw - p.root.rotation.y),
+        ) * Math.min(1, dt * 15);
       const wind =
         phase < 0.3 ? -1.2 - phase * 4 : -2.4 + ((phase - 0.3) / 0.7) * 3.4;
       this.rig.arms[1].rotation.set(wind, 0, -0.38);
       this.rig.arms[0].rotation.set(wind * 0.85, 0, 0.5);
       this.rig.torso.rotation.x = phase > 0.3 ? 0.14 : -0.08;
     } else {
-      p.root.rotation.y = m.moving > 0.05 ? m.direction : p.root.rotation.y;
+      if (m.moving > 0.05)
+        p.root.rotation.y +=
+          Math.atan2(
+            Math.sin(m.direction - p.root.rotation.y),
+            Math.cos(m.direction - p.root.rotation.y),
+          ) * Math.min(1, dt * 12);
       this.rig.arms[0].rotation.set(-walk * 0.3, 0, 0.08);
       this.rig.arms[1].rotation.set(walk * 0.3, 0, -0.08);
       this.rig.torso.rotation.x = 0;
       this.ring.setEnabled(false);
     }
-    this.keeper.pose(this.time, m.moving, phase, this.swing.kind);
+    this.keeper.pose(
+      this.time * (m.moving > 0.05 ? 1 + m.s.levels.speed * 0.12 : 1),
+      m.moving,
+      phase,
+      this.swing.kind,
+    );
     for (const [kind, mesh] of Object.entries(this.rig.tools))
       mesh.setEnabled(
         (phase >= 0 &&
@@ -734,12 +807,17 @@ export class WorldView {
     this.ring.scaling.setAll(1 + Math.sin(this.time * 18) * 0.025);
     const casters: Mesh[] = this.rig.root
         .getChildMeshes()
-        .filter((mesh) => mesh.isEnabled()) as Mesh[],
+        .filter(
+          (mesh) =>
+            mesh.isEnabled() &&
+            !mesh.name.startsWith("carried-log") &&
+            mesh.name !== "carried-planks",
+        ) as Mesh[],
       radius = Math.max(17, (this.camera.orthoRight || 5) + 8);
     this.visibleActors = 0;
     for (const w of m.crew.workers) {
       const rig = this.crewRigs[w.id];
-      rig.root.setEnabled(w.active);
+      rig.root.setEnabled(false);
       rig.shadow.setEnabled(w.active);
       if (!w.active) continue;
       rig.root.position.copyFrom(
@@ -908,13 +986,24 @@ export class WorldView {
     const liveDrops = new Set(m.drops.map((d) => d.id));
     for (const [id, mesh] of this.dropMeshes)
       if (!liveDrops.has(id)) {
-        mesh.dispose();
+        mesh.setEnabled(false);
+        (this.dropPools[mesh.metadata.dropKind] ??= []).push(mesh);
         this.dropMeshes.delete(id);
       }
     for (const d of m.drops) {
       let mesh = this.dropMeshes.get(d.id);
       if (!mesh) {
-        mesh = this.art.resource(d.kind, d.id);
+        let source = this.dropSources[d.kind];
+        if (!source) {
+          source = this.art.resource(d.kind, "drop-source-" + d.kind);
+          source.setEnabled(false);
+          this.dropSources[d.kind] = source;
+        }
+        mesh =
+          (this.dropPools[d.kind] ??= []).pop() ??
+          source.createInstance("pooled-drop-" + d.kind);
+        mesh.metadata = { dropKind: d.kind };
+        mesh.isPickable = false;
         this.dropMeshes.set(d.id, mesh);
       }
       const h =
@@ -1016,8 +1105,8 @@ export class WorldView {
     this.place(
       this.guideLabel,
       worldPoint(
-        guide.target.x,
-        guide.target.y,
+        guide.target.x + 30,
+        guide.target.y + 35,
         guide.kind === "wood" ? 3.6 : 1.25,
       ),
       guide.kind !== "done" && guide.kind !== "build",
@@ -1031,7 +1120,7 @@ export class WorldView {
       this.model.time - this.model.investments.servedAt < 1500 &&
       this.model.investments.economy.sold > 0
         ? "ありがとう！"
-        : `木5 → ✦ ${4 + this.model.investments.economy.market}`;
+        : `板材1 → ✦ ${2 + this.model.investments.economy.market}`;
     this.place(
       this.customerLabel,
       worldPoint(customerPoint.x - 15, customerPoint.y, 1.45),
@@ -1040,10 +1129,88 @@ export class WorldView {
     );
     this.investments ??= new InvestmentView(this.art, this.model, this.shadows);
     this.investments.update(this.time);
+    this.investments.waiter.root.setEnabled(false);
+    this.investments.customers.forEach((c) => c.root.setEnabled(false));
+    for (const person of this.people) {
+      const { rig, keeper, role, id } = person;
+      const production = m.investments.production;
+      let at: Point,
+        active = true,
+        heading = 0,
+        cargo = 0,
+        moving = 0,
+        phase = -1;
+      if (role === "crew") {
+        const w = m.crew.workers[id];
+        at = w;
+        active = w.active;
+        heading = w.heading;
+        cargo = w.cargo;
+        moving = ["walk", "deliver"].includes(w.phase) ? 1 : 0;
+        phase = w.phase === "harvest" ? (this.time * 2) % 1 : -1;
+      } else if (role === "waiter") {
+        const w = m.investments.waiter;
+        at = w;
+        active = w.active;
+        heading = w.heading;
+        cargo = w.cargo;
+        moving = w.phase === "rest" ? 0 : 1;
+      } else if (role === "hauler") {
+        const h = m.investments.hauler;
+        at = h;
+        active = production.hauler;
+        heading = h.heading;
+        cargo = h.cargo;
+        moving = h.phase === "take" ? 0 : 1;
+      } else if (role === "sawyer") {
+        at = { x: 380 + Math.sin(this.time * 1.4) * 22, y: 460 };
+        active = production.sawyer;
+        heading = Math.PI;
+        phase = production.processing ? (this.time * 2) % 1 : -1;
+      } else {
+        at = { x: customerPoint.x - id * 32, y: customerPoint.y + id * 38 };
+        heading = Math.PI;
+      }
+      active = active && Math.hypot(at.x - m.player.x, at.y - m.player.y) < 500;
+      rig.root.setEnabled(active);
+      if (!active) continue;
+      rig.root.position.copyFrom(worldPoint(at.x, at.y));
+      rig.root.rotation.y +=
+        Math.atan2(
+          Math.sin(heading - rig.root.rotation.y),
+          Math.cos(heading - rig.root.rotation.y),
+        ) * Math.min(1, dt * 12);
+      keeper.pose(
+        this.time * (moving ? m.investments.workerSpeed : 1),
+        moving,
+        phase,
+        "wood",
+      );
+      const carriedStone =
+        role === "crew" && m.crew.workers[id].kind === "stone";
+      rig.wood.forEach((mesh, i) =>
+        mesh.setEnabled(i < cargo && role === "crew" && !carriedStone),
+      );
+      rig.planks.thinInstanceCount = Math.min(8, cargo);
+      rig.planks.setEnabled(cargo > 0 && role !== "crew");
+      rig.stone.forEach((mesh, i) =>
+        mesh.setEnabled(carriedStone && i < Math.min(4, Math.ceil(cargo / 2))),
+      );
+      rig.food.setEnabled(false);
+      for (const [kind, tool] of Object.entries(rig.tools))
+        tool.setEnabled(
+          kind ===
+            (role === "crew" && m.crew.workers[id].kind === "stone"
+              ? "stone"
+              : "wood") &&
+            (role === "crew" || role === "sawyer"),
+        );
+    }
     this.scene.render();
   }
   metrics() {
     return {
+      production: this.production.metrics(),
       renderer: "Babylon.js WebGL",
       keeper: this.keeper.metrics(),
       crew: this.model.crew.workers,

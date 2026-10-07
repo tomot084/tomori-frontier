@@ -17,6 +17,11 @@ import {
   InvestmentSystem,
   investmentTiles,
   customerPoint,
+  inputPoint,
+  outputPoint,
+  sawPoint,
+  tillPoint,
+  marketPoint,
 } from "./investments";
 const capFor = (kind: string, capacity: number) =>
   kind === "food" ? Math.floor(capacity / 2) : capacity;
@@ -50,6 +55,7 @@ export interface DropItem extends Point {
 }
 export interface GameEvent extends Point {
   type:
+    | "flow"
     | "pickup"
     | "swing"
     | "hit"
@@ -62,6 +68,10 @@ export interface GameEvent extends Point {
     | "toast"
     | "save"
     | "upgrade";
+  toX?: number;
+  toY?: number;
+  height?: number;
+  toHeight?: number;
   id?: string;
   kind?: string;
   color?: number;
@@ -113,9 +123,13 @@ export class GameModel {
     // Keep the hub's investment pads free of trees; retain node IDs and resource supply.
     for (const n of this.nodes) {
       if (
-        [...investmentTiles, customerPoint]
+        [...investmentTiles, customerPoint, inputPoint, outputPoint, sawPoint]
           .filter((t) => t.y >= 190 + n.zone * 550 && t.y < 730 + n.zone * 550)
-          .some((t) => Math.hypot(n.x - t.x, n.y - t.y) < 82)
+          .some(
+            (t) =>
+              Math.hypot(n.x - t.x, n.y - t.y) <
+              ([inputPoint, outputPoint, sawPoint].includes(t) ? 125 : 82),
+          )
       ) {
         n.x = n.x < 450 ? 150 : 785;
         n.y = Math.min(610 + n.zone * 550, n.y + 38);
@@ -179,6 +193,19 @@ export class GameModel {
         (t) => t.id === this.investments.focus,
       )!;
       return { kind: "build", target: tile, remaining: 0 };
+    }
+    const line = this.investments.production;
+    if (this.s.zone === 0 && this.investments.economy.sold < 5) {
+      if (line.uncollected)
+        return { kind: "build", target: tillPoint, remaining: 0 };
+      if (line.carried)
+        return { kind: "build", target: marketPoint, remaining: 0 };
+      if (line.output)
+        return { kind: "build", target: outputPoint, remaining: 0 };
+      if (line.input || line.processing)
+        return { kind: "build", target: sawPoint, remaining: 0 };
+      if (this.s.resources.wood >= 5)
+        return { kind: "build", target: inputPoint, remaining: 0 };
     }
     if (this.s.won || this.s.zone >= 3)
       return { kind: "done", target: this.player, remaining: 0 };
@@ -351,7 +378,7 @@ export class GameModel {
           );
           this.event("death", n, { id: n.id, kind: n.kind });
           if (!this.s.resources.wood && n.kind === "wood")
-            this.toast("木を集めた！ 市場で売るか、橋へ届けよう");
+            this.toast("丸太を集めた！ 製材所INPUTへ。橋にも使える");
         }
       }
     }
@@ -461,6 +488,20 @@ export class GameModel {
         b = buildingData[i];
       if (Math.hypot(p.x - 450, p.y - b.y) < 112) {
         this.depositAt = time + 140;
+        const line = this.investments.production;
+        if (line.carried && this.s.progress[i].wood < b.cost.wood) {
+          line.carried--;
+          this.s.progress[i].wood++;
+          this.investments.transfer(
+            p,
+            { x: 450, y: b.y },
+            "plank",
+            1.4 + Math.floor(line.carried / 2) * 0.22,
+          );
+          this.rewardConstruction(i);
+          this.finishConstruction(i);
+          this.event("deposit", p, { kind: "wood", index: i });
+        }
         const r = (["wood", "stone", "food"] as const).find((r) =>
           deposit(this.s, i, r),
         );

@@ -51,7 +51,12 @@ for (const size of [
         type: "touchMove",
         touchPoints: [{ x: 125, y: size.height - 145 }],
       });
-      await page.waitForTimeout(450);
+      await expect
+        .poll(async () => (await state(page)).x)
+        .toBeGreaterThan(initial.x + 10);
+      await expect
+        .poll(async () => (await state(page)).y)
+        .toBeLessThan(initial.y - 10);
       await session.send("Input.dispatchTouchEvent", {
         type: "touchEnd",
         touchPoints: [],
@@ -70,7 +75,12 @@ for (const size of [
     await expect
       .poll(async () => (await state(page)).resources.wood, { timeout: 12000 })
       .toBeGreaterThan(0);
-    await pos(page, 695, 390);
+    const stoneNode = await page.evaluate(() =>
+      (window as any).__game
+        .entities()
+        .nodes.find((n: any) => n.kind === "stone" && n.zone === 0 && !n.dead),
+    );
+    await pos(page, stoneNode.x, stoneNode.y);
     await expect
       .poll(async () => (await state(page)).resources.stone, { timeout: 12000 })
       .toBeGreaterThan(0);

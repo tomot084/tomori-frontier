@@ -1,13 +1,14 @@
-import { marketPoint } from "./investments";
+import { inputPoint } from "./investments";
 import { buildingData, gatherableData } from "./data";
 import type { GameModel, Point } from "./simulation";
 export interface LanternWorker extends Point {
   id: number;
   active: boolean;
   zone: number;
-  phase: "search" | "walk" | "harvest" | "deliver" | "rest";
+  phase: "search" | "walk" | "harvest" | "pickup" | "deliver" | "rest";
   kind: "wood" | "stone";
   cargo: number;
+  pending: number;
   targetId: string;
   clock: number;
   heading: number;
@@ -24,6 +25,7 @@ export class LanternCrew {
     x: 690,
     y: 940,
     cargo: 0,
+    pending: 0,
     targetId: "",
     clock: 0,
     heading: 0,
@@ -120,32 +122,46 @@ export class LanternCrew {
             w.clock = 0;
           }
         } else {
+          const prev = w.clock;
           w.clock += dt;
+          if (Math.floor(prev / 0.6) < Math.floor(w.clock / 0.6))
+            g.event("hit", n, { id: n.id, kind: n.kind });
           if (w.clock >= (w.kind === "wood" ? 1.8 : 2.3)) {
             n.hp = 0;
             n.dead = g.time + gatherableData[n.kind].respawn * 1000;
-            w.cargo =
+            w.pending =
               gatherableData[n.kind].yield +
               g.investments.resourceBonus(n.kind);
             g.event("death", n, { id: n.id, kind: n.kind });
             g.burst(n, w.kind === "wood" ? 0xe4b577 : 0xbcd9db, 5);
+            w.phase = "pickup";
+            w.clock = 0;
+          }
+        }
+      } else if (w.phase === "pickup") {
+        w.clock += dt;
+        if (w.clock >= 0.08) {
+          w.clock = 0;
+          w.cargo++;
+          w.pending--;
+          g.investments.transfer({ x: w.x + 18, y: w.y + 8 }, w, w.kind, 0.2);
+          if (w.pending <= 0) {
             w.targetId = "";
             w.phase = "deliver";
-            w.clock = 0;
           }
         }
       } else if (
         w.phase === "deliver" &&
-        walk(market ? marketPoint : { x: 450, y: b.y - 45 })
+        walk(market ? inputPoint : { x: 450, y: b.y - 45 })
       ) {
         w.clock += dt;
         if (w.clock >= 0.18) {
           w.clock = 0;
           if (market) {
-            if (g.investments.economy.stock >= g.investments.storageCapacity)
-              continue;
-            g.investments.economy.stock++;
-            g.burst(marketPoint, 0xe4b577, 1);
+            if (g.investments.production.input >= 200) continue;
+            g.investments.production.input++;
+            g.investments.transfer(w, inputPoint, "wood", 1 + w.cargo * 0.25);
+            g.burst(inputPoint, 0xe4b577, 1);
           } else if (progress[w.kind] < b.cost[w.kind]) {
             progress[w.kind]++;
             g.event("deposit", w, { kind: w.kind, index: zone });

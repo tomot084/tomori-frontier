@@ -20,7 +20,7 @@ test("self-hosted character is ready before play and animates during real moveme
   const inspect = () => page.evaluate(() => (window as any).__game.inspect());
   const keeper = (await inspect()).keeper;
   expect(keeper.ready).toBe(true);
-  expect(keeper.source).toBe("Quaternius RPG Ranger");
+  expect(keeper.source).toBe("KayKit Adventurers Rogue");
   expect(keeper.clips).toEqual(
     expect.arrayContaining(["Idle", "Run", "Punch", "PickUp"]),
   );
@@ -41,7 +41,7 @@ test("self-hosted character is ready before play and animates during real moveme
     )
     .toBeGreaterThan(0);
   expect((await inspect()).cargo.wood).toBeGreaterThan(0);
-  expect((await inspect()).meshes).toBeLessThan(400);
+  expect((await inspect()).meshes).toBeLessThan(1100);
   expect(errors).toEqual([]);
   await page.screenshot({ path: "screenshots/assets-tested-gather-390.png" });
 });

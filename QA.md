@@ -1,3 +1,39 @@
+# 木材の物理生産・自動化（2026-10-07）
+
+現状390×844と今回の参考6枚を実画像として確認してから改修。
+人物・積載・INPUT、加工・OUTPUT・売上、NPC・自動化の3レビューと再修正を実施。
+詳細は [今回の比較・設計記録](docs/physical-economy-2026-10-07.md)、
+素材・ライセンスは [asset-sources](docs/asset-sources.md)。画像と原本は公開していない。
+
+- Unit: **33件成功**。既存の進行・戦闘・セーブに加え、1個ずつ荷下ろし、製材の有人/自動条件、
+  OUTPUT停止、販売と回収、運搬予約の保存・数量保全、販売係の到着前請求の防止。
+- Browser: 開発配信で既存10ケース＋新経済の390/412/1280を成功確認。
+- Production: ビルド済みファイルで**全13ケース成功（21.4分）**。
+  最終の雇用表記・帽子・混載位置・販売到着判定の修正後、素材/crew/新経済390/旧セーブの
+  **4ケースも再成功（2.1分）**。最終ケースはHUDの40灯貨表示も確認。
+- サイズ: **390×844 touch / 412×915 touch / 1280×720 keyboard**。
+  実採集→drop→pickup→stack→INPUT→製材→OUTPUT→市場→灯貨→回収→投資→NPC→コンベア→自動化→save→reload。
+  進行フックは移動だけで、経済ループの資源・灯貨は付与していない。
+- 回帰: 橋/門/灯台、戦闘、工房、market、investment、crew、旧v1復元、画面回転、DPR3。
+- TypeScript: error 0。production build成功。
+- ブラウザconsole error / warning、ページ例外、asset HTTPエラー: 0。
+  PlaywrightプロセスのNO_COLOR/FORCE_COLOR通知はブラウザconsoleとは別。
+- 不要スクロールなし。touch/key release後の移動停止を確認。
+- dist: 142ファイルのallowlist監査成功。index.html、生成JS/CSS、必要なkeeper.glbのみ。
+  ローカル参考画像・比較画像・原本・作業データ・source mapを含めない。
+- 旧進行を消さず、production不足項目にdefault。INPUT/OUTPUT/製材途中/板材/雇用/設備/未回収/回収途中を復元。
+- 大量表示: production実画面で100本の画面外までの積載、INPUT75/OUTPUT45〜60、灯貨100を確認。
+  在庫/板材はthin instance、飛行物は固定プール、dropは共有形状の再利用。NPCは同じ451KBモデルを共有。
+- 低FPS対策: 経過時間を最大1秒・60ms以下のステップで進め、軽量表示の内部長辺を720px以下へ。
+  画面外在庫/NPCの描画・ポーズ更新を抑制し、経済は続ける。
+
+WSL/SwiftShaderのChromium検証。実機Safari/AndroidのFPS測定は未実施。
+Quaternius候補木は公式Driveのquotaで取得できず、実モデル比較は未実施。
+既存Kenney木を改良し、無断の代替素材は使わない。
+公開コミットのActions/Pagesと配信ファイル一致は公開後の最終報告で確認する。
+
+---
+
 # 参考画像による外観改善（2026-10-05）
 
 5枚すべてを実画像として閲覧し、390×844の修正前・第1回・第2回・軽量化後・production進行の実スクリーンショットを比較。原因・修正・残る差は `docs/visual-review-2026-10-05.md` に記録。

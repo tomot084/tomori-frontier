@@ -1,6 +1,6 @@
 # Third-party 3D assets
 
-Selected for Tomori Frontier on 2026-10-05. All runtime assets are self-hosted;
+Historical selection record from 2026-10-05; the active character replacement is documented below (2026-10-07). All runtime assets are self-hosted;
 there are no runtime requests to asset sites, Drive or CDNs.
 
 | Asset                                                                         | Author / primary source                                                          | License                                                   | Published representation                                                  |
@@ -73,3 +73,37 @@ and public-artifact allowlist remain unchanged.
 5種の地面タイルと費用表示（DynamicTexture）、道具台・かご・市場の小物、客用の板張りはプロジェクト内のコードで生成。配達係・客は既存のTomori独自精霊モデルを使用。追加の外部素材、参考画像由来の画像、外部音源は含まない。既存Kenney/QuaterniusのCC0出典は変更なし。
 
 The six additional investment props (sawmill, quarry, depot, cart, collection lantern, bounty board) added on 2026-10-06 are original code-generated geometry; no new third-party asset files or reference images are published.
+
+## Physical timber economy (2026-10-07)
+
+The active player, two woodcutters, timber hauler, sawyer, seller and customers now
+use **KayKit Adventurers — Rogue**, by Kay Lousberg / KayKit, from the
+[user-approved official repository](https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0).
+The repository's `LICENSE.txt` explicitly grants **CC0 1.0**; the exact record is
+retained in `docs/licenses/kaykit-adventurers.txt`. No purchase or account was used.
+`public/models/keeper.glb` replaces the former Quaternius Ranger runtime file.
+Only Idle, Running_A, 1H_Melee_Attack_Chop, PickUp and Hit_A are retained (runtime
+aliases Idle / Run / Punch / PickUp / RecieveHit). Weapons/accessories not used by
+the game are stripped, and retained binary views are repacked by
+`scripts/prepare-kaykit.py`. Runtime size is 450,824 bytes. The atlas is shared
+by character clones; role clothes, hats, tools and lanterns are original game
+geometry/materials. All characters share this one model series.
+
+The previous Ranger is historical and is no longer distributed. Its original
+license record remains for provenance. Existing **Kenney Nature Kit 2.1** trees
+remain active under their recorded CC0 license; trunk width/height and crown width
+are adapted, with three silhouette variants, hit/fell/regrow and occlusion.
+
+The approved [Quaternius Stylized Tree Pack](https://quaternius.com/packs/stylizedtree.html)
+page explicitly labels this pack CC0. On this date the official Drive OBJ and
+license downloads returned **Quota exceeded**, including the alternate official
+Drive download endpoint. No candidate geometry could be obtained, so a same-camera
+runtime comparison with that pack could not be completed and no asset from it
+was adopted. The original download responses remain private local evidence.
+
+The approved [Kenney Factory Kit](https://kenney.nl/assets/factory-kit) page lists
+CC0. No model from this pack was necessary: Tomori's wood pallets, teal/gold moving
+belt, cutting wheel, plank piles and lantern-currency objects are original code
+geometry. No Factory Kit ZIP or model is distributed. No other external assets
+were searched for or added. User reference images, original downloads, candidate
+files and screenshots stay outside published artifacts.

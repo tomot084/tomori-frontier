@@ -52,7 +52,7 @@ describe("progression", () => {
     s.zone = 1;
     s.levels.speed = 2;
     s.resources.coin = 33;
-    expect(load(JSON.stringify(s))).toEqual(s);
+    expect(load(JSON.stringify(s))).toMatchObject(s);
     for (const raw of [
       "broken",
       "{}",
@@ -69,5 +69,5 @@ it("caps upgrade levels and keeps currency on rejected purchases", () => {
   const saved = JSON.stringify(s);
   expect(upgrade(s, "capacity")).toBe(false);
   expect(JSON.stringify(s)).toBe(saved);
-  expect(stats(s).capacity).toBe(70);
+  expect(stats(s).capacity).toBe(120);
 });

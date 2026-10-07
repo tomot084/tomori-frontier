@@ -108,7 +108,9 @@ function boot() {
     const low = view.quality !== "low";
     view.quality = low ? "low" : "balanced";
     view.engine.setHardwareScalingLevel(
-      low ? 1.35 : 1 / Math.min(devicePixelRatio, 1.25),
+      low
+        ? Math.max(1.35, view.width / 720, view.height / 720)
+        : 1 / Math.min(devicePixelRatio, 1.25),
     );
     view.shadows.getShadowMap()!.refreshRate = low ? 2 : 1;
     el("quality").textContent = `描画品質：${low ? "軽量" : "標準"}`;
@@ -168,7 +170,7 @@ function boot() {
   let slowFrames = 0;
   view.engine.runRenderLoop(() => {
     const now = performance.now(),
-      delta = Math.min(240, now - last);
+      delta = Math.min(1000, now - last);
     last = now;
     const paused =
       !started ||
@@ -185,7 +187,8 @@ function boot() {
         x: dir.x + (ui.shopOpen ? 0 : debugInput.x),
         y: dir.y + (ui.shopOpen ? 0 : debugInput.y),
       };
-      // Keep real-time gathering on slower renderers, with bounded movement steps.
+      // Account for long render frames in <=60ms steps (max one second of catch-up).
+      // Visibility changes reset last, so paused/background time is never simulated.
       for (let remaining = delta; remaining > 0; remaining -= 60)
         model.step(Math.min(remaining, 60), input);
     }
@@ -213,7 +216,9 @@ function boot() {
     else slowFrames = Math.max(0, slowFrames - delta);
     if (slowFrames > 2000 && view.quality !== "low") {
       view.quality = "low";
-      view.engine.setHardwareScalingLevel(1.35);
+      view.engine.setHardwareScalingLevel(
+        Math.max(1.35, view.width / 720, view.height / 720),
+      );
       view.shadows.getShadowMap()!.refreshRate = 2;
       view.resize();
       el("quality").textContent = "描画品質：軽量";

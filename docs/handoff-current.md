@@ -1,3 +1,27 @@
+# Tomori Frontier — physical economy handoff (2026-10-07)
+
+開始main `407884e`。現在の中心は「丸太を積む→INPUTへ1本ずつ→実製材→板材の山→市場→灯貨の山→投資」。
+新しい別の投資・セーブを作らず、既存economy/crew/investmentsへ統合。
+人物は同じKayKit Rogueで主人公・木こり・運搬・製材・販売・客を表現。
+容量は1段階+20（最大120）、積載描画は100個まで。3回の視覚レビューを実施。
+
+`src/production-view.ts` は在庫・搬送・ベルトの表示と固定プール。
+`investments.ts` はINPUT/加工/OUTPUT/板材搬送/売上/回収と3つの追加投資。
+`crew.ts` の市場ルートは製材所INPUTへ丸太を届ける。
+製材所の既存perkは採集量ではなく製材速度へ、depotはOUTPUT容量と市場容量へ効く。
+売値は板材1枚2〜5灯貨。最初の製材はプレイヤーの近くで進み、製材担当またはベルトで自動化。
+
+v1資源・進行・強化を保持。economy.productionにdefault付きの追加状態。
+運搬予約は在庫に残し、回収途中の灯貨も保持して重複・消失を防ぐ。
+UIの購入は地面タイルから補助パネルを開き、購入後は閉じる。
+
+Unit33成功。production全13成功、最終差分の4ケースも成功。QA.mdに範囲と制約。
+比較・調整は `docs/physical-economy-2026-10-07.md`、出典はasset-sources。
+参考6枚・画像・原本・比較環境はGit管理外。Quaternius候補木は公式quotaのため未取得。
+新runtimeは451KBのkeeper.glbのみ。Kenney既存木を維持・改良。Factory Kitは未使用（設備は自作）。
+
+---
+
 # Tomori Frontier — current handoff
 
 ## 選択肢を11種へ拡張（2026-10-06）

@@ -51,7 +51,7 @@ export const upgradeData: Record<
   gather: { name: "道具", base: 7, description: "木を一撃で採集 · 速度 +25%" },
   speed: { name: "旅靴", base: 6, description: "移動 +12%" },
   health: { name: "灯衣", base: 6, description: "最大HP +20" },
-  capacity: { name: "背かご", base: 5, description: "容量 +10" },
+  capacity: { name: "背かご", base: 5, description: "容量 +20" },
 };
 export const buildingData: Building[] = [
   { name: "芽渡り橋", y: 730, cost: { wood: 20, stone: 10, food: 0 }, zone: 1 },
@@ -78,7 +78,34 @@ export const perkIds: Perk[] = [
   "magnet",
   "bounty",
 ];
+export interface Production {
+  input: number;
+  output: number;
+  carried: number;
+  processing: number;
+  clock: number;
+  conveyor: boolean;
+  hauler: boolean;
+  sawyer: boolean;
+  uncollected: number;
+  collecting?: number;
+  collectionClock?: number;
+}
+export const freshProduction = (): Production => ({
+  input: 0,
+  output: 0,
+  carried: 0,
+  processing: 0,
+  clock: 0,
+  conveyor: false,
+  hauler: false,
+  sawyer: false,
+  uncollected: 0,
+  collecting: 0,
+  collectionClock: 0,
+});
 export interface Economy {
+  production?: Production;
   perks?: Partial<Record<Perk, number>>;
   route?: "build" | "market";
   carriers: number;
@@ -139,7 +166,7 @@ export const stats = (s: Save): PlayerStats => ({
   gather: 650 / (1 + s.levels.gather * 0.25),
   speed: 130 * (1 + s.levels.speed * 0.12),
   hp: 80 + s.levels.health * 20,
-  capacity: 20 + s.levels.capacity * 10,
+  capacity: 20 + s.levels.capacity * 20,
 });
 export const cost = (s: Save, u: Upgrade) =>
   Math.ceil(upgradeData[u].base * 1.55 ** s.levels[u]);
@@ -202,6 +229,35 @@ export function load(raw: string | null): Save {
       ...v,
       economy: v.economy
         ? {
+            production: {
+              ...freshProduction(),
+              ...Object.fromEntries(
+                [
+                  "input",
+                  "output",
+                  "carried",
+                  "processing",
+                  "uncollected",
+                  "collecting",
+                ].map((k) => [
+                  k,
+                  Number.isSafeInteger(v.economy.production?.[k])
+                    ? Math.max(0, Math.min(100000, v.economy.production[k]))
+                    : 0,
+                ]),
+              ),
+              clock: Number.isFinite(v.economy.production?.clock)
+                ? Math.max(0, Math.min(10, v.economy.production.clock))
+                : 0,
+              collectionClock: Number.isFinite(
+                v.economy.production?.collectionClock,
+              )
+                ? Math.max(0, Math.min(1, v.economy.production.collectionClock))
+                : 0,
+              conveyor: v.economy.production?.conveyor === true,
+              hauler: v.economy.production?.hauler === true,
+              sawyer: v.economy.production?.sawyer === true,
+            },
             ...(v.economy.perks
               ? {
                   perks: Object.fromEntries(

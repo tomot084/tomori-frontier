@@ -17,7 +17,7 @@ test("small deliveries fund an early tool upgrade and the workshop pauses play",
   for (let delivery = 0; delivery < 2; delivery++) {
     await page.evaluate(() => {
       const g = (window as any).__game;
-      const p = g.inspect().guidance.target;
+      const p = g.entities().nodes.find((n:any)=>n.kind==="wood" && n.zone===0 && !n.dead);
       g.position(p.x, p.y);
     });
     await expect

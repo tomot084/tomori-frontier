@@ -8,34 +8,38 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import type { Art } from "./models";
 import type { AnimationGroup } from "@babylonjs/core/Animations/animationGroup";
 
-/** Adapted Quaternius CC0 rig, with Tomori's own tools and resource rack. */
+/** Adapted KayKit CC0 rig, with Tomori's own tools and resource rack. */
 export class Keeper {
+  static container: ReturnType<typeof LoadAssetContainerAsync> | undefined;
   private active?: AnimationGroup;
   private clips = new Map<string, AnimationGroup>();
   body!: Mesh;
   private grip!: ReturnType<Art["player"]>["toolPivot"];
-  async load(art: Art, rig: ReturnType<Art["player"]>) {
-    const container = await LoadAssetContainerAsync(
+  async load(art: Art, rig: ReturnType<Art["player"]>, roleColor = 0x46b5b1) {
+    const container = await (Keeper.container ??= LoadAssetContainerAsync(
       import.meta.env.BASE_URL + "models/keeper.glb",
       art.scene,
-    );
-    container.addAllToScene();
-    const assetRoot = container.meshes[0];
+    ));
+    const instance = container.instantiateModelsToScene((name) => name, false, {
+      doNotInstantiate: true,
+    });
+    const assetRoot = instance
+      .rootNodes[0] as import("@babylonjs/core/Meshes/transformNode").TransformNode;
     assetRoot.parent = rig.root;
     assetRoot.rotationQuaternion = null;
     assetRoot.rotation.y = Math.PI;
     // Match the existing feet, reach and collision dimensions.
-    assetRoot.scaling.x *= 0.84;
-    assetRoot.scaling.y *= 0.71;
-    assetRoot.scaling.z *= 0.84;
+    assetRoot.scaling.x *= 1;
+    assetRoot.scaling.y *= 1;
+    assetRoot.scaling.z *= 1;
     rig.toolPivot.parent = rig.root;
     const oldBody = rig.body;
     oldBody.dispose();
     for (const pivot of [...rig.legs, ...rig.arms])
       for (const mesh of pivot.getChildMeshes()) mesh.dispose();
-    const meshes = container.meshes.filter(
-      (m) => m.getTotalVertices() > 0,
-    ) as Mesh[];
+    const meshes = assetRoot
+      .getChildMeshes()
+      .filter((m) => m.getTotalVertices() > 0) as Mesh[];
     for (const mesh of meshes) {
       if (/bow/i.test(mesh.name)) {
         mesh.setEnabled(false);
@@ -52,9 +56,13 @@ export class Keeper {
       source.environmentIntensity = 0.25;
       source.backFaceCulling = false;
       source.emissiveColor = Color3.Black();
-      if (mesh.name === "Cloak") {
+      if (mesh.name === "Rogue_Cape" || mesh.name === "Rogue_Body") {
         const cloth = new StandardMaterial("tomori-hood", art.scene);
-        cloth.diffuseColor = new Color3(0.25, 0.7, 0.7);
+        cloth.diffuseColor = Color3.FromInts(
+          roleColor >> 16,
+          (roleColor >> 8) & 255,
+          roleColor & 255,
+        );
         cloth.specularColor = Color3.Black();
         cloth.backFaceCulling = false;
         mesh.material = cloth;
@@ -64,14 +72,16 @@ export class Keeper {
     }
     rig.body = this.body;
     // glTF animated bone transform nodes provide the grip without a second limb rig.
-    const hand = container.transformNodes.find((n) => n.name === "Fist.R");
+    const hand = assetRoot
+      .getDescendants()
+      .find((n) => n.name === "handslot.r");
     if (!hand) throw new Error("Keeper hand attachment missing");
     this.grip = rig.toolPivot;
     rig.toolPivot.parent = hand;
     rig.toolPivot.position.set(0, 0, 0);
-    rig.toolPivot.rotation.set(0, 0, -Math.PI / 2);
-    rig.toolPivot.scaling.setAll(1 / 0.75);
-    for (const group of container.animationGroups) {
+    rig.toolPivot.rotation.set(0, 0, 0);
+    rig.toolPivot.scaling.setAll(1);
+    for (const group of instance.animationGroups) {
       this.clips.set(group.name, group);
       group.stop();
     }
@@ -100,8 +110,10 @@ export class Keeper {
       8,
     );
     lantern.parent = rig.torso;
-    const head = container.transformNodes.find((n) => n.name === "Head")!;
-    head.scaling.scaleInPlace(1.12);
+    const head = assetRoot.getDescendants().find((n) => n.name === "head")!;
+    (
+      head as import("@babylonjs/core/Meshes/transformNode").TransformNode
+    ).scaling.scaleInPlace(1.08);
     for (const side of [-1, 1]) {
       const eye = art.sphere(
         "keeper-eye",
@@ -115,11 +127,26 @@ export class Keeper {
       );
       eye.parent = head;
     }
+    const cap = art.cylinder(
+      "role-cap",
+      0,
+      2.35,
+      0,
+      0.36,
+      0.39,
+      0.1,
+      roleColor,
+      8,
+    );
+    cap.parent = rig.root;
+    cap.setParent(
+      head as import("@babylonjs/core/Meshes/transformNode").TransformNode,
+    );
     this.pose(0, 0, -1, "wood");
   }
   metrics() {
     return {
-      source: "Quaternius RPG Ranger",
+      source: "KayKit Adventurers Rogue",
       ready: !!this.body,
       clip: this.active?.name,
       clips: [...this.clips.keys()],
