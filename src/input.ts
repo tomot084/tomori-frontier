@@ -45,7 +45,7 @@ export class MovementInput {
         dx: 0,
         dy: 0,
       };
-      ui.classList.add("active");
+      ui.classList.add("active", "learned");
       this.paint();
     });
     canvas.addEventListener("pointermove", (e) => {

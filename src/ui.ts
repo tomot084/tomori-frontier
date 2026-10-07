@@ -7,7 +7,7 @@ import {
   type Resource,
   type Upgrade,
 } from "./data";
-import { GameModel } from "./simulation";
+import { GameModel, camps } from "./simulation";
 import {
   investmentTiles,
   marketPoint,
@@ -171,17 +171,33 @@ export class GameUI {
     const system = this.model.investments,
       economy = system.economy;
     const nearest = system.nearest;
-    el("invest-toggle").hidden = !started || this.investmentOpen;
+    el("invest-toggle").hidden =
+      !started || this.investmentOpen || this.shopOpen;
+    const campDistance = Math.min(
+      ...camps
+        .slice(0, s.zone + 1)
+        .map((p) =>
+          Math.hypot(p.x - this.model.player.x, p.y - this.model.player.y),
+        ),
+    );
+    const targetDistance = nearest
+      ? Math.hypot(
+          nearest.x - this.model.player.x,
+          nearest.y - this.model.player.y,
+        )
+      : Infinity;
+    const atWorkshop = campDistance < 95 && campDistance < targetDistance;
     el("tile-action").hidden =
       !started ||
       this.investmentOpen ||
+      this.shopOpen ||
       !nearest ||
-      (!s.resources.coin &&
-        nearest.id !== "sawmill" &&
-        nearest.id !== "market");
-    if (nearest)
+      atWorkshop;
+    if (nearest) {
+      const offer = system.offer(nearest.id);
       el("tile-action").innerHTML =
-        `<b>${nearest.name}</b><small>${nearest.id === "market" ? "板材を売る / 灯貨を回収" : "費用・効果を見る"} ↗</small>`;
+        `<b>${nearest.name}</b><small>${nearest.id === "market" ? "市場を見る" : nearest.id === "sawmill" ? "強化を見る" : offer.level >= offer.max ? "詳細を見る" : `${offer.price}灯貨 · ${["carrier", "waiter", "hauler", "sawyer"].includes(nearest.id) ? "雇用を見る" : "投資する"}`}</small>`;
+    }
     el("invest-return").hidden = !system.focus;
     const investmentKey = JSON.stringify([
       economy,
@@ -314,11 +330,6 @@ export class GameUI {
     el("chapter").textContent = s.won
       ? "ALL CLEAR"
       : `島 ${Math.min(s.zone + 1, 3)} / 3`;
-    const names = [
-      "芽渡り橋をつくろう",
-      "霧払い門を復旧しよう",
-      "暁の灯台に光をともそう",
-    ];
     const goalKey = JSON.stringify([
       this.model.guidance,
       s.zone,
@@ -363,7 +374,7 @@ export class GameUI {
             : "橋へ素材を届けよう"
           : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;
         el("goal").innerHTML =
-          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${names[s.zone].replace("をつくろう", "").replace("を復旧しよう", "").replace("に光をともそう", "")} · ${Math.min(100, Math.round((done / total) * 100))}%${economy.carriers > 0 ? ` · ${economy.route === "market" ? "市場" : "建築"}担当${economy.carriers}人` : " · 市場で木を売って投資もできる"}</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
+          `<b>${arrow} ${focused ? `${focused.name}タイルへ行こう` : building && s.zone > 0 ? "建築地点へ素材を届けよう" : title}</b><small>${Math.min(100, Math.round((done / total) * 100))}%</small><i class="goal-progress" style="--progress:${Math.min(100, (done / total) * 100)}%"></i>`;
       }
     }
     const line = system.production;
@@ -377,7 +388,7 @@ export class GameUI {
         s.resources.wood >= 10)
     ) {
       el("goal").innerHTML =
-        `<b>${line.uncollected ? "市場の金庫へ → 灯貨を回収" : line.carried ? "板材を市場へ → 灯貨を回収" : line.output ? "OUTPUTの板材を拾って市場へ" : line.input || line.processing ? "丸太 → 製材 → 板材" : "丸太を製材所INPUTへ運ぼう"}</b><small>INPUT ${line.input} · OUTPUT ${line.output} · 運ぶ板材 ${line.carried} · 未回収 ✦ ${line.uncollected}</small>`;
+        `<b>${line.uncollected ? "市場の金庫へ → 灯貨を回収" : line.carried ? "板材を市場へ → 灯貨を回収" : line.output ? "OUTPUTの板材を拾って市場へ" : line.input || line.processing ? "丸太 → 製材 → 板材" : "丸太を製材所INPUTへ運ぼう"}</b>`;
     }
     const ready =
       s.levels.gather === 0 && s.resources.coin >= cost(s, "gather");
@@ -385,13 +396,14 @@ export class GameUI {
       ? "装備に投資できる"
       : "灯貨で装備を強化";
     const show =
-      started && !this.investmentOpen && (s.zone > 0 || s.resources.coin > 0);
+      started && !this.investmentOpen && (atWorkshop || this.shopOpen);
     el("shop-toggle").classList.toggle(
       "upgrade-ready",
       (Object.keys(upgradeData) as Upgrade[]).some(
         (u) => s.levels[u] < 5 && s.resources.coin >= cost(s, u),
       ),
     );
+    el("shop-toggle").hidden = !show || this.shopOpen;
     this.shopShown = show;
     el("shop").hidden = !show;
     if (!show && this.shopOpen) this.toggleShop(false);

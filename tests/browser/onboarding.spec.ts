@@ -17,7 +17,9 @@ test("small deliveries fund an early tool upgrade and the workshop pauses play",
   for (let delivery = 0; delivery < 2; delivery++) {
     await page.evaluate(() => {
       const g = (window as any).__game;
-      const p = g.entities().nodes.find((n:any)=>n.kind==="wood" && n.zone===0 && !n.dead);
+      const p = g
+        .entities()
+        .nodes.find((n: any) => n.kind === "wood" && n.zone === 0 && !n.dead);
       g.position(p.x, p.y);
     });
     await expect
@@ -48,6 +50,7 @@ test("small deliveries fund an early tool upgrade and the workshop pauses play",
       page.evaluate(() => (window as any).__game.state().resources.coin),
     )
     .toBe(8);
+  await page.evaluate(() => (window as any).__game.position(450, 290));
   await page.getByRole("button", { name: "工房を開く" }).click();
   const before = await page.evaluate(() => (window as any).__game.state());
   await page.waitForTimeout(700);

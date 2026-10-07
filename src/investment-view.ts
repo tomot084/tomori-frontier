@@ -22,11 +22,35 @@ export class InvestmentView {
   ) {
     for (const tile of investmentTiles) {
       const parts = [
-        art.box(`${tile.id}-foundation`, 0, 0.06, 0, 2.45, 0.12, 2.2, 0xe3d4a8),
+        art.box(
+          `${tile.id}-foundation`,
+          0,
+          0.025,
+          0,
+          1.45,
+          0.05,
+          1.25,
+          0x82936b,
+        ),
       ];
       // Each investment has an original miniature prop, readable without a floating panel.
       if (["conveyor", "hauler", "sawyer"].includes(tile.id)) {
-        // Hiring pads remain flat so the production line and workers stay readable.
+        for (const x of [-0.7, 0.7])
+          parts.push(
+            art.box(
+              "survey-stake",
+              x,
+              0.25,
+              0.6,
+              0.09,
+              0.5,
+              0.09,
+              palette.wood,
+            ),
+          );
+        parts.push(
+          art.box("survey-sign", 0.7, 0.45, 0.6, 0.4, 0.25, 0.06, palette.cut),
+        );
       } else if (tile.id === "tool") {
         parts.push(
           art.box("workbench", 0, 0.55, 0.65, 1.5, 0.22, 0.65, palette.wood),
@@ -253,11 +277,11 @@ export class InvestmentView {
       this.customers.push(customer);
     }
     const deck = art.merge("customer-landing", [
-      art.box("customer-deck", 0, 0.04, 0, 2.2, 0.08, 1.6, palette.wood),
-      art.box("deck-edge", 0, 0.09, -0.7, 2.25, 0.06, 0.12, palette.cut),
+      art.box("customer-deck", 0, 0.04, 0, 3.1, 0.08, 1.6, palette.wood),
+      art.box("deck-edge", 0, 0.09, -0.7, 3.15, 0.06, 0.12, palette.cut),
     ]);
     deck.position.copyFrom(
-      worldPoint(customerPoint.x - 16, customerPoint.y + 18),
+      worldPoint(customerPoint.x - 29, customerPoint.y + 15),
     );
     this.bases.push(deck);
     const pieces = [];
@@ -295,34 +319,27 @@ export class InvestmentView {
       for (const { texture, tile } of this.paints) {
         const c = texture.getContext() as CanvasRenderingContext2D;
         c.clearRect(0, 0, 256, 256);
-        c.fillStyle = `#${tile.color.toString(16)}`;
-        c.fillRect(8, 8, 240, 240);
-        c.strokeStyle = "#fff1cb";
-        c.lineWidth = 6;
-        c.setLineDash([22, 10]);
-        c.strokeRect(17, 17, 222, 222);
-        c.setLineDash([]);
-        c.textAlign = "center";
-        c.fillStyle = "#fff8df";
-        c.font = "bold 31px sans-serif";
-        c.fillText(tile.name, 128, 220);
-        const offer = this.game.investments.offer(tile.id);
-        c.font = "bold 35px sans-serif";
-        c.fillText(
-          offer.level >= offer.max ? "MAX" : `✦ ${offer.price}`,
-          128,
-          178,
-        );
+        // A small survey outline belongs to the world; prices belong to the local action.
+        c.strokeStyle = "#c8bc8b";
+        c.lineWidth = 3;
+        c.setLineDash([14, 22]);
+        c.strokeRect(36, 36, 184, 184);
         texture.update();
       }
     }
     for (const base of this.bases) {
       if (base.name === "investment-bounty")
         base.setEnabled(this.game.s.zone > 0);
+      for (const id of ["conveyor", "hauler", "sawyer"] as const)
+        if (base.name === `investment-${id}`)
+          base.setEnabled(!this.game.investments.production[id]);
     }
     for (const { texture, tile } of this.paints) {
       const plane = this.art.scene.getMeshByName(`tile-${tile.id}`);
-      plane?.setEnabled(tile.id !== "bounty" || this.game.s.zone > 0);
+      const offer = this.game.investments.offer(tile.id);
+      plane?.setEnabled(
+        offer.level === 0 && (tile.id !== "bounty" || this.game.s.zone > 0),
+      );
     }
     const w = this.game.investments.waiter;
     this.waiter.root.setEnabled(w.active);

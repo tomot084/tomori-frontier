@@ -43,6 +43,8 @@ it("waiter reservations survive reload and revenue remains collectible instead o
   g.player = { x: 450, y: 290 };
   run(g, 100);
   expect(g.investments.waiter.cargo).toBe(5);
+  expect(g.investments.economy.stock).toBe(20);
+  expect(g.investments.economy.sold).toBe(0);
   const resumed = new GameModel(load(JSON.stringify(g.snapshot())));
   run(resumed, 18000);
   expect(resumed.investments.economy.sold).toBe(20);

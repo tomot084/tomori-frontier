@@ -24,9 +24,9 @@ export const investmentTiles: {
   { id: "waiter", name: "販売係", x: 600, y: 365, color: 0xb7a0ca },
   { id: "sawmill", name: "製材所", x: 380, y: 430, color: 0xb88952 },
   { id: "quarry", name: "石切り場", x: 180, y: 560, color: 0x789ca8 },
-  { id: "depot", name: "預かり倉庫", x: 360, y: 590, color: 0x93aa71 },
+  { id: "depot", name: "預かり倉庫", x: 270, y: 585, color: 0x93aa71 },
   { id: "cart", name: "運搬車", x: 725, y: 205, color: 0xba986d },
-  { id: "magnet", name: "回収灯", x: 380, y: 615, color: 0x79bdb1 },
+  { id: "magnet", name: "回収灯", x: 350, y: 645, color: 0x79bdb1 },
   { id: "bounty", name: "討伐掲示板", x: 535, y: 965, color: 0xca947b },
 ];
 investmentTiles.push(
@@ -393,14 +393,22 @@ export class InvestmentSystem {
     const h = this.hauler;
     if (p.hauler) {
       const target = h.phase === "deliver" ? marketPoint : outputPoint;
-      const dx = target.x - h.x,
-        dy = target.y - h.y,
-        d = Math.hypot(dx, dy);
+      // Use the back aisle so loaded haulers do not cut through the player's foreground.
+      const via =
+        h.phase === "deliver" && h.x < 565
+          ? { x: 575, y: 365 }
+          : h.phase === "return" && h.x > 335
+            ? { x: 325, y: 365 }
+            : target;
+      const dx = via.x - h.x,
+        dy = via.y - h.y,
+        travel = Math.hypot(dx, dy),
+        d = Math.hypot(target.x - h.x, target.y - h.y);
       h.heading = Math.atan2(dx, -dy);
-      const move = Math.min(d, dt * 150 * this.workerSpeed);
-      if (d) {
-        h.x += (dx / d) * move;
-        h.y += (dy / d) * move;
+      const move = Math.min(travel, dt * 150 * this.workerSpeed);
+      if (travel) {
+        h.x += (dx / travel) * move;
+        h.y += (dy / travel) * move;
       }
       if (d < 12) {
         h.clock += dt;
@@ -462,7 +470,8 @@ export class InvestmentSystem {
     const w = this.waiter;
     w.active = e.waiter;
     if (w.active) {
-      const target = w.phase === "deliver" ? customerPoint : marketPoint;
+      const station = w.phase === "deliver" ? customerPoint : marketPoint;
+      const target = { x: station.x + 24, y: station.y - 10 };
       const dx = target.x - w.x,
         dy = target.y - w.y,
         d = Math.hypot(dx, dy);
@@ -477,7 +486,8 @@ export class InvestmentSystem {
         w.phase = "deliver";
       }
       if (
-        Math.hypot(w.x - customerPoint.x, w.y - customerPoint.y) < 12 &&
+        Math.hypot(w.x - (customerPoint.x + 24), w.y - (customerPoint.y - 10)) <
+          12 &&
         w.phase === "deliver" &&
         this.saleClock >= 0.12 &&
         e.stock

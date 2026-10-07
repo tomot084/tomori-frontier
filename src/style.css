@@ -1175,3 +1175,220 @@ dialog #close {
 .route-options button { background: #e7eddd; color: #47685e; border: 2px solid #b7c9b7; }
 #investment-filters button { padding: 8px 5px; min-width: 0; font-size: 12px; white-space: nowrap; }
 .line-label { position:absolute; left:0;top:0; padding:4px 7px; background:#234e49e8; color:#fff0bf; border:1px solid #eedda1; border-radius:7px;font-size:11px;font-weight:800;white-space:nowrap;pointer-events:none; }
+
+/* Progressive disclosure: fixed HUD, local actions, then explicit detail sheets. */
+#hud {
+  top: calc(env(safe-area-inset-top) + 8px);
+}
+.hud-heading {
+  min-height: 22px;
+  margin-bottom: 5px;
+  margin-right: 95px;
+}
+.wordmark {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  gap: 3px;
+}
+.wordmark i {
+  font-size: 17px;
+}
+#chapter {
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.resource-chip {
+  padding: 4px 4px 3px;
+  border-bottom-width: 1px;
+  border-radius: 9px;
+  background: #f7f8eeed;
+}
+.resource-chip strong {
+  font-size: 19px;
+}
+.resource-chip svg {
+  width: 21px;
+  height: 21px;
+}
+.vitals {
+  height: 18px;
+}
+.health {
+  height: 6px;
+}
+.objective {
+  padding: 5px 9px;
+  background: #24484dde;
+  border-color: #ffffff38;
+  border-radius: 9px;
+}
+#goal b {
+  font-size: 13px;
+  line-height: 1.4;
+}
+#goal small {
+  font-size: 10px;
+  margin-top: 0;
+}
+.goal-progress {
+  margin-top: 3px;
+  height: 3px;
+}
+#settings {
+  right: 12px;
+  top: calc(env(safe-area-inset-top) + 5px);
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+#invest-toggle {
+  top: calc(env(safe-area-inset-top) + 5px);
+  right: 61px;
+  bottom: auto;
+  min-height: 44px;
+  padding: 7px 9px;
+  font-size: 11px;
+  border: 1px solid #ffffff80;
+  border-radius: 10px;
+  box-shadow: none;
+  background: #f7f8eeed;
+}
+#tile-action,
+#shop-toggle {
+  min-width: 150px;
+  min-height: 52px;
+  padding: 7px 12px;
+  border: 1px solid #ffffff80;
+  border-radius: 12px;
+  background: #f7f8eef2;
+  box-shadow: 0 3px 9px #23474b30;
+  animation: context-in 150ms ease-out;
+}
+#tile-action {
+  left: auto;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 30px);
+  transform: none;
+}
+#tile-action b,
+#shop-toggle b {
+  font-size: 13px;
+}
+#shop {
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 30px);
+}
+#shop-toggle.upgrade-ready {
+  box-shadow: 0 3px 9px #23474b30;
+  border-color: #d6ba79;
+}
+#stick {
+  width: 92px;
+  height: 92px;
+  opacity: 0.38;
+  transition: opacity 150ms;
+}
+#stick.active {
+  opacity: 1;
+}
+#stick:after {
+  top: 100px;
+}
+#stick.learned:after {
+  display: none;
+}
+#shop-panel {
+  max-height: calc(
+    100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 60px
+  );
+  overflow-y: auto;
+}
+@keyframes context-in {
+  from {
+    opacity: 0;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-height: 550px) {
+  #hud {
+    max-width: 350px;
+    top: calc(env(safe-area-inset-top) + 6px);
+  }
+  #invest-toggle {
+    right: 61px;
+    bottom: auto;
+  }
+  #tile-action {
+    left: auto;
+    bottom: calc(env(safe-area-inset-bottom) + 20px);
+  }
+  #shop {
+    bottom: calc(env(safe-area-inset-bottom) + 20px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #tile-action,
+  #shop-toggle {
+    animation: none;
+  }
+  #stick {
+    transition: none;
+  }
+}
+.hud-heading {
+  min-height: 40px;
+}
+#goal {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+}
+#goal b {
+  font-size: 13px;
+}
+#goal small {
+  text-align: right;
+}
+.goal-progress {
+  grid-column: 1 / -1;
+}
+.site-label,
+.line-label,
+.customer-label,
+.guide-label,
+.camp-label {
+  animation: context-in 150ms ease-out;
+}
+.line-label,
+.customer-label,
+.guide-label,
+.site-label {
+  background: #304c45d9;
+  color: #f3edce;
+  border: 1px solid #c9c69b66;
+  box-shadow: none;
+  padding: 4px 7px;
+  border-radius: 7px;
+  font-size: 10px;
+}
+.site-label span {
+  color: #e0e2c8;
+}
+.site-label:after {
+  border-top-color: #304c45d9;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-label,
+  .line-label,
+  .customer-label,
+  .guide-label,
+  .camp-label {
+    animation: none;
+  }
+}

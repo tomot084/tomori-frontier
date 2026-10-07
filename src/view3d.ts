@@ -60,15 +60,15 @@ export class WorldView {
     for (const [role, id, tint] of [
       ["crew", 0, 0xd69857],
       ["crew", 1, 0x99b87c],
-      ["waiter", 0, 0xf5d779],
+      ["waiter", 0, 0xc7b27b],
       ["hauler", 0, 0x83b7ce],
-      ["sawyer", 0, 0xd9805d],
+      ["sawyer", 0, 0xb99076],
       ["customer", 0, 0xbbadce],
       ["customer", 1, 0xb4c69d],
     ] as [string, number, number][]) {
       const rig = this.art.player(8),
         keeper = new Keeper();
-      rig.root.scaling.setAll(role === "customer" ? 0.82 : 1);
+      rig.root.scaling.setAll(role === "customer" ? 0.78 : 0.94);
       await keeper.load(this.art, rig, tint);
       rig.root.setEnabled(false);
       this.people.push({ rig, keeper, role, id });
@@ -363,7 +363,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 7.3 : 8;
+    const halfHeight = ratio < 0.8 ? 8.3 : 9.1;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -403,7 +403,7 @@ export class WorldView {
       v.z < 1 &&
       v.x > -100 &&
       v.x < this.width + 100 &&
-      v.y > (this.width < this.height ? 200 : 120) &&
+      v.y > (this.width < this.height ? 165 : 120) &&
       v.y < this.height - 50;
     element.hidden = !inside;
     if (inside) {
@@ -1083,7 +1083,7 @@ export class WorldView {
         worldPoint(590, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1.4),
         i <= m.s.zone &&
           (m.s.zone <= i || i === 2) &&
-          Math.abs(m.player.y - buildingData[i].y) < 340 &&
+          Math.hypot(m.player.x - 590, m.player.y - buildingData[i].y) < 145 &&
           !(
             i === 0 &&
             ["market", "waiter"].includes(m.investments.nearest?.id ?? "")
@@ -1099,7 +1099,9 @@ export class WorldView {
       this.place(
         label,
         worldPoint(campPts[i][0], campPts[i][1] - 10, 1.9),
-        i <= m.s.zone,
+        i <= m.s.zone &&
+          Math.hypot(m.player.x - campPts[i][0], m.player.y - campPts[i][1]) <
+            125,
       ),
     );
     this.place(
@@ -1109,7 +1111,10 @@ export class WorldView {
         guide.target.y + 35,
         guide.kind === "wood" ? 3.6 : 1.25,
       ),
-      guide.kind !== "done" && guide.kind !== "build",
+      guide.kind !== "done" &&
+        guide.kind !== "build" &&
+        Math.hypot(m.player.x - guide.target.x, m.player.y - guide.target.y) <
+          135,
     );
     if (!this.customerLabel) {
       this.customerLabel = document.createElement("div");
@@ -1125,7 +1130,7 @@ export class WorldView {
       this.customerLabel,
       worldPoint(customerPoint.x - 15, customerPoint.y, 1.45),
       Math.hypot(m.player.x - customerPoint.x, m.player.y - customerPoint.y) <
-        280,
+        95,
     );
     this.investments ??= new InvestmentView(this.art, this.model, this.shadows);
     this.investments.update(this.time);
@@ -1163,12 +1168,12 @@ export class WorldView {
         cargo = h.cargo;
         moving = h.phase === "take" ? 0 : 1;
       } else if (role === "sawyer") {
-        at = { x: 380 + Math.sin(this.time * 1.4) * 22, y: 460 };
+        at = { x: 380 + Math.sin(this.time * 1.4) * 12, y: 380 };
         active = production.sawyer;
         heading = Math.PI;
         phase = production.processing ? (this.time * 2) % 1 : -1;
       } else {
-        at = { x: customerPoint.x - id * 32, y: customerPoint.y + id * 38 };
+        at = { x: customerPoint.x - id * 58, y: customerPoint.y + id * 30 };
         heading = Math.PI;
       }
       active = active && Math.hypot(at.x - m.player.x, at.y - m.player.y) < 500;

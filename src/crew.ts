@@ -48,11 +48,11 @@ export class LanternCrew {
       if (w.zone !== zone) {
         Object.assign(w, {
           zone,
-          x: zone === 0 ? 570 : 690,
-          y: zone === 0 ? 205 : 940 + (zone - 1) * 550,
+          x: (zone === 0 ? 570 : 690) + w.id * 36,
+          y: (zone === 0 ? 205 : 940 + (zone - 1) * 550) + w.id * 28,
           phase: "search",
           cargo: 0,
-          clock: 0,
+          clock: w.id * 0.35,
           targetId: "",
         });
       }
@@ -152,7 +152,11 @@ export class LanternCrew {
         }
       } else if (
         w.phase === "deliver" &&
-        walk(market ? inputPoint : { x: 450, y: b.y - 45 })
+        walk(
+          market
+            ? { x: inputPoint.x + (w.id ? 18 : -18), y: inputPoint.y - 18 }
+            : { x: 450 + (w.id ? 20 : -20), y: b.y - 45 },
+        )
       ) {
         w.clock += dt;
         if (w.clock >= 0.18) {

@@ -212,14 +212,14 @@ export class ProductionView {
       );
       pile.mesh.thinInstanceCount = count;
       this.labels[k].textContent =
-        `${["INPUT 丸太", "OUTPUT 板材", "市場 板材", "回収 灯貨"][k]} ${counts[k]}`;
+        `${["丸太", "板材", "市場の板材", "回収 灯貨"][k]} ${counts[k]}`;
       place(
         this.labels[k],
         worldPoint(pile.at.x, pile.at.y + 28, 0.2),
         Math.hypot(
           this.game.player.x - pile.at.x,
           this.game.player.y - pile.at.y,
-        ) < 340,
+        ) < 78 && counts[k] > 0,
       );
     }
     this.conveyor.setEnabled(p.conveyor);
