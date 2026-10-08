@@ -95,3 +95,22 @@ it("offscreen stacks still widen for 1000, 5000 and 10000 units", () => {
   expect(stackBulk(10000)).toBeGreaterThan(stackBulk(5000) * 1.3);
   expect(stackBulk(100000)).toBe(2.3);
 });
+
+it("preserves a new reward kind in a full pool with a singleton at the front", () => {
+  const g = new GameModel(fresh());
+  g.spawn(g.player, "wood", 1);
+  for (let i = 0; i < 8; i++) g.spawn(g.player, "coin", 16);
+  expect(g.drops).toHaveLength(128);
+  g.spawn(g.player, "food", 80);
+  g.spawn(g.player, "stone", 50);
+  expect(g.drops).toHaveLength(128);
+  for (const [kind, amount] of [
+    ["wood", 1],
+    ["coin", 128],
+    ["food", 80],
+    ["stone", 50],
+  ])
+    expect(
+      g.drops.filter((d) => d.kind === kind).reduce((n, d) => n + d.amount, 0),
+    ).toBe(amount);
+});

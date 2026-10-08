@@ -324,14 +324,16 @@ export class GameModel {
       if (existing) existing.amount += n;
       else {
         // Merge a pair of another kind to reserve a slot for this new reward.
-        const first = this.drops[0];
-        const index = this.drops.findIndex(
-          (d, i) => i > 0 && d.kind === first.kind,
-        );
-        if (index >= 0) {
-          first.amount += this.drops[index].amount;
-          this.drops.splice(index, 1);
-          this.spawn(at, kind, n);
+        const seen = new Map<Resource, number>();
+        for (let i = 0; i < this.drops.length; i++) {
+          const previous = seen.get(this.drops[i].kind);
+          if (previous !== undefined) {
+            this.drops[previous].amount += this.drops[i].amount;
+            this.drops.splice(i, 1);
+            this.spawn(at, kind, n);
+            break;
+          }
+          seen.set(this.drops[i].kind, i);
         }
       }
       return;
