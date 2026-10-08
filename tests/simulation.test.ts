@@ -208,3 +208,24 @@ it("partial construction rewards survive reload without paying a milestone twice
   expect(resumed.s.progress[1].wood).toBe(28);
   expect(resumed.s.resources.coin).toBe(3);
 });
+
+it("hub resources remain reachable, plentiful and separated after visual layout changes", () => {
+  const game = new GameModel(fresh());
+  const nodes = game.nodes.filter((n) => n.zone === 0);
+  expect(nodes).toHaveLength(19);
+  expect(nodes.find((n) => n.id === "node-0-0")).toMatchObject({
+    x: 140,
+    y: 390,
+  });
+  for (const [i, node] of nodes.entries()) {
+    expect(node.y).toBeGreaterThanOrEqual(190);
+    expect(node.y).toBeLessThanOrEqual(643);
+    expect(node.x).toBeGreaterThanOrEqual(80);
+    expect(node.x).toBeLessThanOrEqual(820);
+    for (const other of nodes.slice(i + 1))
+      expect(
+        Math.hypot(node.x - other.x, node.y - other.y),
+        `${node.id} / ${other.id}`,
+      ).toBeGreaterThanOrEqual(80);
+  }
+});

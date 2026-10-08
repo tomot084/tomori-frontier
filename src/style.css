@@ -1392,3 +1392,74 @@ dialog #close {
     animation: none;
   }
 }
+
+
+/* Visual quality pass: keep the field open and give the next step the strongest hierarchy. */
+#hud {
+  top: calc(env(safe-area-inset-top) + 6px);
+}
+.hud-heading {
+  margin-bottom: 4px;
+}
+#resources {
+  gap: 4px;
+}
+.resource-chip {
+  padding: 3px 5px;
+  border-radius: 10px;
+  background: #fffdf1ed;
+}
+.resource-chip strong {
+  font-size: 18px;
+}
+.resource-chip small,
+.resource-chip small span {
+  font-size: 9px;
+  line-height: 1.2;
+}
+.resource-chip svg {
+  width: 20px;
+  height: 20px;
+}
+.vitals {
+  height: 16px;
+  gap: 5px;
+}
+.health {
+  width: 78px;
+  height: 5px;
+}
+.heart {
+  font-size: 12px;
+}
+#hp-value {
+  font-size: 9px;
+}
+.objective {
+  padding: 5px 9px;
+  background: #214e59ed;
+  border-color: #ffffff55;
+}
+#goal b {
+  font-size: 12px;
+}
+#goal small {
+  font-size: 9px;
+}
+.goal-progress {
+  height: 2px;
+  margin-top: 3px;
+}
+#stick:not(.active) {
+  opacity: 0.55;
+}
+#toast {
+  max-width: calc(100% - 32px);
+  font-size: 11px;
+}
+.guide-label {
+  background: #fff4ce;
+  color: #62471d;
+  border-color: #fff9e8;
+  font-weight: 800;
+}

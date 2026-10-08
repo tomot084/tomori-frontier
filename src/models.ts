@@ -249,18 +249,18 @@ export class Art {
       ),
     ];
     const leaves = harvestable
-      ? [0x55b971, 0x7bc965, 0x63bc73]
-      : [0x88aa8d, 0x9ab68e, 0x8faf92];
+      ? [0x329c62, 0x77bd57, 0x49ac67]
+      : [0x83a58b, 0x96b08a, 0x87a58c];
     for (let i = 0; i < 3; i++)
       parts.push(
         this.sphere(
           "grove-crown",
-          (i - 1) * 0.54,
-          2.02 + (i === 1 ? 0.5 : 0),
+          (i - 1) * 0.62,
+          2.08 + (i === 1 ? 0.58 : 0),
           i === 1 ? 0.1 : 0,
-          1.85,
-          1.65,
-          1.7,
+          i === 1 ? 1.95 : 1.6,
+          i === 1 ? 1.8 : 1.5,
+          i === 1 ? 1.8 : 1.5,
           leaves[i],
         ),
       );

@@ -161,12 +161,48 @@ export function makeScenery(art: Art) {
     art.tint(path, 0xddc69b);
     details.push(path);
     if (zone === 0) {
+      // A quiet rounded work yard groups production and sales; details stay at the edges.
+      const positions = [0, 0, 0],
+        indices: number[] = [];
+      const corners = [
+        [4.7, 3],
+        [-4.7, 3],
+        [-4.7, -3],
+        [4.7, -3],
+      ];
+      for (let corner = 0; corner < 4; corner++) {
+        for (let step = 0; step <= 6; step++) {
+          const angle = (corner * Math.PI) / 2 + (step * Math.PI) / 12;
+          positions.push(
+            corners[corner][0] + Math.cos(angle),
+            0,
+            corners[corner][1] + Math.sin(angle),
+          );
+        }
+      }
+      const count = positions.length / 3 - 1;
+      for (let i = 1; i <= count; i++)
+        indices.push(0, i, i === count ? 1 : i + 1);
+      const yardData = new VertexData();
+      yardData.positions = positions;
+      yardData.indices = indices;
+      yardData.uvs = positions.flatMap((_, i) =>
+        i % 3 === 0
+          ? [positions[i] / 12 + 0.5, positions[i + 2] / 8 + 0.5]
+          : [],
+      );
+      yardData.normals = Array.from({ length: positions.length }, (_, i) =>
+        i % 3 === 1 ? 1 : 0,
+      );
+      const yard = new Mesh("rounded-production-yard", art.scene);
+      yardData.applyToMesh(yard);
+      art.tint(yard, 0xe4cc9e);
+      yard.position.copyFrom(worldPoint(420, 475, 0.04));
+      details.push(yard);
       // Forest behind camp fills the opening view, leaving the walking route clear.
-      for (let i = 0; i < 10; i++) {
+      for (let i = 0; i < 4; i++) {
         const tree = art.tree(90 + i, 0, false);
-        tree.position.copyFrom(
-          worldPoint(145 + (i % 7) * 100, 55 + Math.floor(i / 7) * 92),
-        );
+        tree.position.copyFrom(worldPoint(145 + i * 210, 35));
         tree.scaling.setAll(0.9 + rand(i + 12) * 0.15);
         tree.name = "border-tree-north-" + i;
         tree.freezeWorldMatrix();
@@ -175,10 +211,10 @@ export function makeScenery(art: Art) {
       }
     }
     // Understory clusters and border trees create a forest, while keeping the main route readable.
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 8; i++) {
       const side = i % 2;
       const x = side ? 775 + rand(i) * 32 : 95 + rand(i) * 40;
-      const y = start + 40 + (Math.floor(i / 2) * (end - start - 80)) / 10;
+      const y = start + 40 + (Math.floor(i / 2) * (end - start - 80)) / 4;
       const tree = art.tree(i + zone * 47, zone, false);
       tree.scaling.setAll(0.7 + rand(i + 4) * 0.25);
       tree.position.copyFrom(worldPoint(x, y));
@@ -186,10 +222,11 @@ export function makeScenery(art: Art) {
       tree.freezeWorldMatrix();
       zones[zone].push(tree);
     }
-    for (let i = 0; i < 65; i++) {
+    for (let i = 0; i < 28; i++) {
       const x = 95 + rand(i + zone * 200) * 710,
         y = start + 32 + rand(i + 83 + zone * 70) * (end - start - 64);
       if (
+        (zone === 0 && x > 210 && x < 710 && y > 190 && y < 660) ||
         Math.abs(x - 450) < 60 ||
         camps.some((c) => Math.hypot(c.x - x, c.y - y) < 92)
       )
@@ -238,6 +275,7 @@ export function makeScenery(art: Art) {
     art.merge("tide-lines-" + zone, foamParts).freezeWorldMatrix();
     const camp = art.camp();
     camp.position.copyFrom(worldPoint(camps[zone].x, camps[zone].y, 0.03));
+    camp.scaling.setAll(0.82);
     camp.freezeWorldMatrix();
     zones[zone].push(camp);
     shadowCasters.push(camp);

@@ -173,8 +173,11 @@ it("transport investments speed up real carrier travel", () => {
   }
   fast.s.resources.coin = 8;
   fast.investments.buy("cart");
-  run(normal, 800);
-  run(fast, 800);
+  // Measure while both workers are travelling, before either reaches a nearby node.
+  run(normal, 200);
+  run(fast, 200);
+  expect(normal.crew.workers[0].phase).toBe("walk");
+  expect(fast.crew.workers[0].phase).toBe("walk");
   const travel = (g: GameModel) =>
     Math.hypot(g.crew.workers[0].x - 570, g.crew.workers[0].y - 205);
   expect(travel(fast) / travel(normal)).toBeCloseTo(1.25, 3);

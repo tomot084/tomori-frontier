@@ -140,6 +140,46 @@ export class GameModel {
     const inletTree = this.nodes.find((n) => n.id === "node-0-2")!;
     inletTree.x = 360;
     inletTree.y = 255;
+    // Spread displaced hub nodes instead of stacking several trees at the same shoreline point.
+    // IDs, yields and respawn rules stay intact; the first tutorial tree remains at its familiar position.
+    const placed = [this.nodes.find((n) => n.id === "node-0-0")!, inletTree];
+    const slots = Array.from({ length: 38 }, (_, i) => 80 + i * 20).flatMap(
+      (x) => Array.from({ length: 23 }, (_, i) => ({ x, y: 195 + i * 20 })),
+    );
+    for (const n of this.nodes
+      .filter((n) => n.zone === 0 && !placed.includes(n))
+      .sort((a, b) => Number(b.kind === "wood") - Number(a.kind === "wood"))) {
+      const clear = (at: Point) =>
+        placed.every(
+          (p) =>
+            Math.hypot(p.x - at.x, p.y - at.y) >=
+            (p.kind === "wood" && n.kind === "wood" ? 100 : 80),
+        ) &&
+        investmentTiles.every(
+          (p) => Math.hypot(p.x - at.x, p.y - at.y) >= 60,
+        ) &&
+        [customerPoint, ...camps].every(
+          (p) => Math.hypot(p.x - at.x, p.y - at.y) >= 82,
+        ) &&
+        Math.hypot(at.x - 450, at.y - buildingData[0].y) >= 100 &&
+        [inputPoint, outputPoint, sawPoint].every(
+          (p) => Math.hypot(p.x - at.x, p.y - at.y) >= 125,
+        );
+      if (!clear(n)) {
+        const at = slots
+          .filter(clear)
+          .sort(
+            (a, b) =>
+              Math.hypot(a.x - n.x, a.y - n.y) -
+              Math.hypot(b.x - n.x, b.y - n.y),
+          )[0];
+        if (at) {
+          n.x = at.x;
+          n.y = at.y;
+        }
+      }
+      placed.push(n);
+    }
     for (let z = 1; z <= 2; z++)
       for (let i = 0; i < 7; i++) {
         const type = i % 3,

@@ -528,11 +528,24 @@ export class InvestmentView {
   }
   update(time: number) {
     for (const base of this.bases) {
-      if (base.name === "investment-bounty")
-        base.setEnabled(this.game.s.zone > 0);
+      const tile = investmentTiles.find(
+        (t) => base.name === `investment-${t.id}`,
+      );
+      if (!tile) continue;
+      const distance = Math.hypot(
+        this.game.player.x - tile.x,
+        this.game.player.y - tile.y,
+      );
+      // Secondary upgrade props emerge only near their interaction area. Core production stays visible.
+      const primary = tile.id === "sawmill" || tile.id === "market";
+      let enabled = primary || distance < 150;
+      base.visibility = primary
+        ? 1
+        : Math.max(0, Math.min(1, (150 - distance) / 50));
+      if (tile.id === "bounty") enabled &&= this.game.s.zone > 0;
       for (const id of ["conveyor", "hauler", "sawyer"] as const)
-        if (base.name === `investment-${id}`)
-          base.setEnabled(!this.game.investments.production[id]);
+        if (tile.id === id) enabled &&= !this.game.investments.production[id];
+      base.setEnabled(enabled);
     }
     const w = this.game.investments.waiter;
     this.waiter.root.setEnabled(w.active);

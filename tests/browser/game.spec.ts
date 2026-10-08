@@ -97,7 +97,7 @@ for (const size of [
           (n: any) =>
             n.kind === kind &&
             !n.dead &&
-            n.y < (s.zone === 0 ? 730 : s.zone === 1 ? 1280 : 1830),
+            n.zone === s.zone,
         );
         if (!n) {
           await page.waitForTimeout(1000);

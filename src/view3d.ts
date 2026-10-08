@@ -151,7 +151,7 @@ export class WorldView {
   width = 390;
   height = 844;
   target = Vector3.Zero();
-  cameraOffset = new Vector3(10, 23, -22);
+  cameraOffset = new Vector3(4, 34, -24);
   shakeUntil = 0;
   swing = { at: -100, kind: "wood", yaw: Math.PI };
   trail: Mesh;
@@ -189,6 +189,7 @@ export class WorldView {
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.46, 0.68, 0.71, 1);
     this.scene.ambientColor = new Color3(0.1, 0.13, 0.12);
+    this.scene.imageProcessingConfiguration.contrast = 1.12;
     this.scene.skipPointerMovePicking = true;
     this.scene.autoClear = true;
     this.camera = new FreeCamera("quarter-view", Vector3.Zero(), this.scene);
@@ -200,29 +201,29 @@ export class WorldView {
       new Vector3(-0.2, 1, 0.1),
       this.scene,
     );
-    sky.intensity = 0.88;
+    sky.intensity = 0.7;
     sky.diffuse = new Color3(0.94, 1, 0.96);
-    sky.groundColor = new Color3(0.76, 0.82, 0.76);
+    sky.groundColor = new Color3(0.38, 0.46, 0.48);
     sky.specular = Color3.Black();
     this.sun = new DirectionalLight(
       "afternoon-sun",
       new Vector3(0.45, -1, 0.28),
       this.scene,
     );
-    this.sun.intensity = 0.52;
+    this.sun.intensity = 0.74;
     this.sun.diffuse = new Color3(1, 0.94, 0.79);
     this.sun.specular = Color3.Black();
     this.sun.shadowMinZ = 1;
     this.sun.shadowMaxZ = 65;
     this.sun.shadowFrustumSize = 30;
-    this.shadows = new ShadowGenerator(512, this.sun);
+    this.shadows = new ShadowGenerator(1024, this.sun);
     this.shadows.useBlurExponentialShadowMap = true;
-    this.shadows.blurKernel = 20;
-    this.shadows.blurScale = 2;
+    this.shadows.blurKernel = 12;
+    this.shadows.blurScale = 1;
     this.shadows.depthScale = 20;
     this.shadows.bias = 0.001;
     this.shadows.normalBias = 0.025;
-    this.shadows.setDarkness(0.24);
+    this.shadows.setDarkness(0.32);
     this.art = new Art(this.scene);
     this.guideRing = MeshBuilder.CreateTorus(
       "next-action",
@@ -241,6 +242,18 @@ export class WorldView {
     this.shadowMaterial = this.makeShadowMaterial();
     this.scenery = makeScenery(this.art);
     this.production = new ProductionView(this.art, model, overlay);
+    // Shared soft contact shadows ground the racks and machinery without a screen-space pass.
+    for (const [x, y, w, d] of [
+      [380, 430, 4.5, 2.2],
+      [465, 430, 2.5, 2],
+      [295, 430, 2.5, 1.8],
+      [610, 500, 3.5, 2.4],
+      [650, 560, 1.7, 1.5],
+    ]) {
+      const contact = this.shadow(w);
+      contact.scaling.z = d / (w * 0.78);
+      contact.position.copyFrom(worldPoint(x, y, 0.045));
+    }
     this.rig = this.art.player();
     this.rig.root.scaling.setAll(1.25);
     this.rig.root.rotation.y = Math.PI;
@@ -249,7 +262,11 @@ export class WorldView {
       { diameter: 1.45, thickness: 0.075, tessellation: 32 },
       this.scene,
     );
-    this.art.tint(this.playerRing, 0xffe5a1);
+    const playerPaint = new StandardMaterial("player-selection", this.scene);
+    playerPaint.diffuseColor = color(0xe3fff4);
+    playerPaint.emissiveColor = color(0x99efde);
+    playerPaint.disableLighting = true;
+    this.playerRing.material = playerPaint;
     this.playerRing.position.y = 0.06;
     for (const n of model.nodes) {
       const root = new TransformNode(n.id, this.scene);
@@ -263,7 +280,7 @@ export class WorldView {
       mesh.parent = root;
       const shadow = this.shadow(n.kind === "wood" ? 2.8 : 1.6);
       shadow.position.copyFrom(root.position);
-      shadow.position.y = 0.034;
+      shadow.position.y = 0.052;
       this.actors.set(n.id, {
         root,
         mesh,
@@ -396,7 +413,7 @@ export class WorldView {
     m.useAlphaFromDiffuseTexture = true;
     m.diffuseColor = new Color3(0.13, 0.26, 0.23);
     m.disableLighting = true;
-    m.alpha = 0.65;
+    m.alpha = 0.78;
     m.disableDepthWrite = true;
     return m;
   }
@@ -415,13 +432,13 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 8.3 * 1.08 : 9.1;
+    const halfHeight = ratio < 0.8 ? 8.7 : 9.1;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
     this.camera.orthoTop = halfHeight;
     this.camera.orthoBottom = -halfHeight;
-    this.sun.shadowFrustumSize = Math.max(30, halfWidth * 2.4);
+    this.sun.shadowFrustumSize = Math.max(22, halfWidth * 2.4);
   }
   /** The visual camera is diagonal; both keyboard and touch move in screen directions. */
   screenInput(input: Point): Point {
@@ -744,9 +761,17 @@ export class WorldView {
         });
         this.pickupBatches.delete(kind);
       }
+    // A gentle hub bias keeps both ends of the saw line on screen while preserving player scale.
+    const hubWeight =
+      this.width < this.height
+        ? Math.max(
+            0,
+            1 - Math.hypot(m.player.x - 390, m.player.y - 440) / 180,
+          ) * 0.3
+        : 0;
     const desired = worldPoint(
-      m.player.x,
-      m.player.y - (this.width < this.height ? 45 : 10),
+      m.player.x + (390 - m.player.x) * hubWeight,
+      m.player.y - (this.width < this.height ? 20 : 10),
     );
     const guide = m.guidance;
     this.guideRing.setEnabled(guide.kind !== "done");
@@ -783,7 +808,7 @@ export class WorldView {
     const p = this.actors.get("player")!;
     p.root.position.copyFrom(worldPoint(m.player.x, m.player.y));
     p.shadow.position.copyFrom(p.root.position);
-    p.shadow.position.y = 0.037;
+    p.shadow.position.y = 0.052;
     this.playerRing.position.copyFrom(p.root.position);
     this.playerRing.position.y = 0.065;
     const cargoAge = this.time - this.cargoBounceAt;
@@ -882,7 +907,7 @@ export class WorldView {
           : Math.sin(this.time * 7) * 0.035;
       rig.wood.setEnabled(w.cargo > 0 && w.kind === "wood");
       rig.stone.setEnabled(w.cargo > 0 && w.kind === "stone");
-      rig.shadow.position.copyFrom(worldPoint(w.x, w.y, 0.036));
+      rig.shadow.position.copyFrom(worldPoint(w.x, w.y, 0.052));
       casters.push(
         rig.body,
         ...(w.cargo ? [w.kind === "wood" ? rig.wood : rig.stone] : []),
@@ -964,7 +989,7 @@ export class WorldView {
       if (dying) a.root.scaling.setAll(Math.max(0.01, 1 - age / 0.26));
       a.mesh.rotation.z = recoil * 0.13;
       a.shadow.position.copyFrom(a.root.position);
-      a.shadow.position.y = 0.035;
+      a.shadow.position.y = 0.052;
       a.mesh.renderOverlay = this.time > a.hitAt && this.time < a.hitAt + 0.14;
       a.mesh.overlayColor = Color3.White();
       a.mesh.overlayAlpha = 0.8;
@@ -1022,8 +1047,10 @@ export class WorldView {
       casters.push(
         ...this.investments.bases.filter(
           (mesh) =>
+            mesh.isEnabled() &&
+            mesh.visibility > 0.9 &&
             Vector3.DistanceSquared(mesh.position, this.target) <
-            radius * radius,
+              radius * radius,
         ),
       );
       if (this.model.investments.waiter.active)

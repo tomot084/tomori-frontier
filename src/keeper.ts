@@ -15,7 +15,7 @@ export class Keeper {
   private clips = new Map<string, AnimationGroup>();
   body!: Mesh;
   private grip!: ReturnType<Art["player"]>["toolPivot"];
-  async load(art: Art, rig: ReturnType<Art["player"]>, roleColor = 0x27c5bc) {
+  async load(art: Art, rig: ReturnType<Art["player"]>, roleColor = 0x247bd4) {
     const container = await (Keeper.container ??= LoadAssetContainerAsync(
       import.meta.env.BASE_URL + "models/keeper.glb?v=be37133ee215",
       art.scene,
@@ -54,7 +54,7 @@ export class Keeper {
       paint.diffuseTexture = source.albedoTexture;
       paint.diffuseColor = new Color3(1.12, 1.1, 1.06);
       paint.emissiveTexture = source.albedoTexture;
-      paint.emissiveColor = new Color3(0.24, 0.24, 0.24);
+      paint.emissiveColor = new Color3(0.12, 0.12, 0.12);
       if (paint.diffuseTexture) paint.diffuseTexture.gammaSpace = true;
       paint.specularColor = Color3.Black();
       paint.backFaceCulling = false;

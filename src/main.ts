@@ -109,9 +109,10 @@ function boot() {
     view.quality = low ? "low" : "balanced";
     view.engine.setHardwareScalingLevel(
       low
-        ? Math.max(1.35, view.width / 720, view.height / 720)
+        ? Math.max(1.15, view.width / 960, view.height / 960)
         : 1 / Math.min(devicePixelRatio, 1.25),
     );
+    view.shadows.mapSize = low ? 512 : 1024;
     view.shadows.getShadowMap()!.refreshRate = low ? 2 : 1;
     el("quality").textContent = `描画品質：${low ? "軽量" : "標準"}`;
     view.resize();
@@ -217,8 +218,9 @@ function boot() {
     if (slowFrames > 2000 && view.quality !== "low") {
       view.quality = "low";
       view.engine.setHardwareScalingLevel(
-        Math.max(1.35, view.width / 720, view.height / 720),
+        Math.max(1.15, view.width / 960, view.height / 960),
       );
+      view.shadows.mapSize = 512;
       view.shadows.getShadowMap()!.refreshRate = 2;
       view.resize();
       el("quality").textContent = "描画品質：軽量";
