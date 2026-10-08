@@ -94,10 +94,7 @@ for (const size of [
           () => (window as any).__game.entities().nodes,
         );
         const n = nodes.find(
-          (n: any) =>
-            n.kind === kind &&
-            !n.dead &&
-            n.zone === s.zone,
+          (n: any) => n.kind === kind && !n.dead && n.zone === s.zone,
         );
         if (!n) {
           await page.waitForTimeout(1000);
@@ -162,15 +159,21 @@ for (const size of [
       expect((await state(page)).won).toBe(true);
       await page.screenshot({ path: "screenshots/complete-390.png" });
     }
-    await page.evaluate(() => (window as any).__game.save());
-    const saved = await state(page);
+    // Freeze ongoing combat/loot so save and restore compare the same instant.
+    await page.getByRole("button", { name: "設定", exact: true }).click();
+    const saved = await page.evaluate(() => {
+      const game = (window as any).__game;
+      game.save();
+      return game.state();
+    });
     await page.reload();
-    await page.getByRole("button", { name: "島へ降りる" }).click();
+    await page.waitForFunction(() => (window as any).__game);
     const restored = await state(page);
     expect(restored.zone).toBe(saved.zone);
     expect(restored.levels).toEqual(saved.levels);
     expect(restored.resources).toEqual(saved.resources);
     expect(restored.progress).toEqual(saved.progress);
+    await page.getByRole("button", { name: "島へ降りる" }).click();
     expect(
       await page.evaluate(
         () =>
