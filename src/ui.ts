@@ -14,6 +14,7 @@ import {
   marketPoint,
   investmentGroups,
   investmentGroup,
+  machineOffers,
   type InvestmentGroup,
   type Investment,
 } from "./investments";
@@ -213,7 +214,15 @@ export class GameUI {
       this.investmentKey = investmentKey;
       const catalog = [...investmentTiles].sort(
         (a, b) =>
+          (system.offer(a.id).unlock > s.zone ? 1 : 0) -
+            (system.offer(b.id).unlock > s.zone ? 1 : 0) ||
           [
+            "turret",
+            "drill",
+            "collector",
+            "fastbelt",
+            "turretReach",
+            "turretTwin",
             "conveyor",
             "hauler",
             "sawyer",
@@ -229,25 +238,36 @@ export class GameUI {
             "magnet",
             "bounty",
           ].indexOf(a.id) -
-          [
-            "conveyor",
-            "hauler",
-            "sawyer",
-            "tool",
-            "sawmill",
-            "carrier",
-            "quarry",
-            "market",
-            "cart",
-            "basket",
-            "waiter",
-            "depot",
-            "magnet",
-            "bounty",
-          ].indexOf(b.id),
+            [
+              "turret",
+              "drill",
+              "collector",
+              "fastbelt",
+              "turretReach",
+              "turretTwin",
+              "conveyor",
+              "hauler",
+              "sawyer",
+              "tool",
+              "sawmill",
+              "carrier",
+              "quarry",
+              "market",
+              "cart",
+              "basket",
+              "waiter",
+              "depot",
+              "magnet",
+              "bounty",
+            ].indexOf(b.id),
       );
       const items = this.selectedInvestment
-        ? investmentTiles.filter((t) => t.id === this.selectedInvestment)
+        ? investmentTiles.filter(
+            (t) =>
+              t.id === this.selectedInvestment ||
+              (this.selectedInvestment === "turret" &&
+                ["turretReach", "turretTwin"].includes(t.id)),
+          )
         : catalog.filter(
             (t) =>
               this.investmentFilter === "すべて" ||
@@ -271,8 +291,8 @@ export class GameUI {
               Math.hypot(t.x - this.model.player.x, t.y - this.model.player.y) <
               100;
           const max = o.level >= o.max,
-            locked = s.zone < o.unlock;
-          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}人` : ["waiter", "hauler", "sawyer"].includes(t.id) ? (o.level ? "雇用済" : "未雇用") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${locked || max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${locked ? `✦ ${o.price}<small>橋の完成で解放</small>` : max ? "MAX" : nearby ? `✦ ${o.price} で${["carrier", "waiter", "hauler", "sawyer"].includes(t.id) ? "雇う" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
+            locked = s.zone < o.unlock || !system.requires(t.id);
+          return `<article class="investment-card" style="--tile-color:#${t.color.toString(16)}"><div><b>${t.name}<em>${t.id === "carrier" ? `${o.level}人` : ["waiter", "hauler", "sawyer"].includes(t.id) ? (o.level ? "雇用済" : "未雇用") : t.id in machineOffers ? (o.level ? "建設済" : "建設予定") : `Lv.${o.level}`}</em></b><span>${o.effect}</span><small>${o.benefit}</small></div><button data-investment="${t.id}" ${locked || max || (nearby && s.resources.coin < o.price) ? "disabled" : ""}>${locked ? `✦ ${o.price}<small>${!system.requires(t.id) ? "先に本体を建設" : `第${o.unlock + 1}島で解放`}</small>` : max ? "MAX" : nearby ? `✦ ${o.price} で${["carrier", "waiter", "hauler", "sawyer"].includes(t.id) ? "雇う" : t.id in machineOffers && !o.level ? "建設" : "強化"}` : `✦ ${o.price}<small>タイルへ行く ↗</small>`}</button></article>`;
         })
         .join("");
       const atMarket =
@@ -282,11 +302,22 @@ export class GameUI {
         ) < 100;
       const p = system.production;
       el("market-action").innerHTML =
-        this.selectedInvestment === "market"
-          ? `<div class="market-card"><b>板材1 → ✦ ${2 + economy.market}<span>販売済 ${economy.sold}枚</span></b><p>製材所のOUTPUTで板材を拾って市場へ。市場に立つと1枚ずつ販売。金庫へ近づいて灯貨を回収。</p><p>運ぶ板材 ${p.carried} · 市場在庫 ${economy.stock} · 未回収 ✦ ${p.uncollected}</p><button id="market-supply" ${!atMarket || (!p.carried && !economy.stock) ? "disabled" : ""}>市場の板材を販売する</button></div>`
-          : this.selectedInvestment === "sawmill"
-            ? `<div class="market-card"><b>丸太 → 板材 → 灯貨</b><p>右のINPUTへ近づくと1本ずつ投入。最初は製材所のそばで作業し、左のOUTPUTから板材を運びます。</p><p>INPUT ${p.input} · 製材中 ${p.processing} · OUTPUT ${p.output} / ${system.outputCapacity}</p></div>`
-            : "";
+        this.selectedInvestment === "drill"
+          ? `<div class="market-card"><b>採掘機の石材 ${economy.drillStock ?? 0} / 500</b><p>岩が戻るたびに掘ります。近づくと石材を受け取れます。</p></div>`
+          : this.selectedInvestment === "collector"
+            ? `<div class="market-card"><b>回収塔の在庫</b><p>${
+                Object.entries(economy.towerStock ?? {})
+                  .map(
+                    ([kind, count]) =>
+                      `${resourceData[kind as Resource].name} ${count}`,
+                  )
+                  .join(" · ") || "周辺の戦利品を待っています"
+              }</p><p>光の輪の内側を吸引。塔のそばで受け取れます。</p></div>`
+            : this.selectedInvestment === "market"
+              ? `<div class="market-card"><b>板材1 → ✦ ${2 + economy.market}<span>販売済 ${economy.sold}枚</span></b><p>製材所のOUTPUTで板材を拾って市場へ。市場に立つと1枚ずつ販売。金庫へ近づいて灯貨を回収。</p><p>運ぶ板材 ${p.carried} · 市場在庫 ${economy.stock} · 未回収 ✦ ${p.uncollected}</p><button id="market-supply" ${!atMarket || (!p.carried && !economy.stock) ? "disabled" : ""}>市場の板材を販売する</button></div>`
+              : this.selectedInvestment === "sawmill"
+                ? `<div class="market-card"><b>丸太 → 板材 → 灯貨</b><p>右のINPUTへ近づくと1本ずつ投入。最初は製材所のそばで作業し、左のOUTPUTから板材を運びます。</p><p>INPUT ${p.input} · 製材中 ${p.processing} · OUTPUT ${p.output} / ${system.outputCapacity}</p></div>`
+                : "";
     }
     const key =
       JSON.stringify(s.resources) + st.capacity + system.production.carried;

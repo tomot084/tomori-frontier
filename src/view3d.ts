@@ -1,3 +1,4 @@
+import { MachineView } from "./machine-view";
 import { visualStack, stackHeight, stackBulk } from "./cargo";
 import { ProductionView } from "./production-view";
 import { InvestmentView } from "./investment-view";
@@ -45,6 +46,7 @@ interface Fragment {
 }
 export class WorldView {
   production!: ProductionView;
+  machines!: MachineView;
   investments!: InvestmentView;
   customerLabel!: HTMLElement;
   keeper = new Keeper();
@@ -245,6 +247,7 @@ export class WorldView {
     this.shadowMaterial = this.makeShadowMaterial();
     this.scenery = makeScenery(this.art);
     this.production = new ProductionView(this.art, model, overlay);
+    this.machines = new MachineView(this.art, model, overlay);
     // Shared soft contact shadows ground the racks and machinery without a screen-space pass.
     for (const [x, y, w, d] of [
       [380, 430, 4.5, 2.2],
@@ -798,6 +801,7 @@ export class WorldView {
     this.time += dt;
     const m = this.model;
     this.syncCargo();
+    this.machines.update((el, at, visible) => this.place(el, at, visible));
     this.production.update(dt, this.time, (el, at, visible) =>
       this.place(el, at, visible),
     );
@@ -1352,6 +1356,7 @@ export class WorldView {
   metrics() {
     return {
       production: this.production.metrics(),
+      machines: this.model.machines.metrics(),
       renderer: "Babylon.js WebGL",
       keeper: this.keeper.metrics(),
       crew: this.model.crew.workers,

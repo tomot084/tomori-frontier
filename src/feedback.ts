@@ -72,7 +72,8 @@ export class GameFeedback {
     if (now - (this.last.get(key) ?? -1000) < (key === "pickup" ? 140 : 70))
       return;
     this.last.set(key, now);
-    if (key === "hit") {
+    if (key === "shot") this.tone(180, 0.055, 0, "square", 0.023);
+    else if (key === "hit") {
       this.tone(
         event.kind === "stone" ? 510 : event.kind === "enemy" ? 150 : 230,
         0.085,

@@ -1,5 +1,12 @@
 import { stackHeight } from "./cargo";
-import { cost, stats, freshProduction, type Economy, type Perk } from "./data";
+import {
+  cost,
+  stats,
+  freshProduction,
+  type Economy,
+  type Perk,
+  type Machine,
+} from "./data";
 import type { GameModel, Point } from "./simulation";
 export type Investment =
   | "tool"
@@ -10,7 +17,8 @@ export type Investment =
   | "conveyor"
   | "hauler"
   | "sawyer"
-  | Perk;
+  | Perk
+  | Machine;
 export const investmentTiles: {
   id: Investment;
   name: string;
@@ -35,6 +43,72 @@ investmentTiles.push(
   { id: "hauler", name: "運搬係", x: 700, y: 430, color: 0x86aec1 },
   { id: "sawyer", name: "製材担当", x: 300, y: 330, color: 0xc98d60 },
 );
+export const turretPoint = { x: 400, y: 1000 };
+export const drillPoint = { x: 170, y: 1120 };
+export const towerPoint = { x: 450, y: 1550 };
+investmentTiles.push(
+  { id: "turret", name: "自動砲台", ...turretPoint, color: 0x579e99 },
+  {
+    id: "turretReach",
+    name: "砲台・照準アンテナ",
+    ...turretPoint,
+    color: 0xe2b35f,
+  },
+  { id: "turretTwin", name: "砲台・双砲身", ...turretPoint, color: 0xe2b35f },
+  { id: "drill", name: "自動採掘機", ...drillPoint, color: 0x789ca8 },
+  { id: "collector", name: "資源回収塔", ...towerPoint, color: 0x79bdb1 },
+  { id: "fastbelt", name: "高速コンベア", x: 470, y: 320, color: 0xe2b35f },
+);
+export const machineOffers: Record<
+  Machine,
+  {
+    price: number;
+    unlock: number;
+    effect: string;
+    benefit: string;
+    requires?: Machine | "conveyor";
+  }
+> = {
+  turret: {
+    price: 150,
+    unlock: 1,
+    effect: "旋回して実弾を発射。基本敵は3発で撃破",
+    benefit: "第2島の戦闘を援護。灯貨を稼ぐ拠点を作る",
+  },
+  turretReach: {
+    price: 90,
+    unlock: 1,
+    requires: "turret",
+    effect: "照準アンテナを増設。射程180 → 250",
+    benefit: "離れた群れも狙える",
+  },
+  turretTwin: {
+    price: 180,
+    unlock: 1,
+    requires: "turret",
+    effect: "第2砲身を増設。別々の敵へ同時発射",
+    benefit: "複数の敵を次々に迎撃",
+  },
+  drill: {
+    price: 120,
+    unlock: 1,
+    effect: "岩を掘り、石材を積む。近づくと受け取れる（最大500）",
+    benefit: "戦闘している間に建築用の石を貯める",
+  },
+  collector: {
+    price: 140,
+    unlock: 2,
+    effect: "半径240の資源を吸引・保管。近づくと回収（各2000）",
+    benefit: "第3島の散った戦利品をまとめて拾う",
+  },
+  fastbelt: {
+    price: 100,
+    unlock: 1,
+    requires: "conveyor",
+    effect: "金色の高速ベルトへ改装。搬送と製材がさらに2倍",
+    benefit: "木こり・運搬係と連続生産を育てる",
+  },
+};
 export const inputCapacity = 10000;
 export const inputPoint = { x: 465, y: 430 };
 export const sawPoint = { x: 380, y: 430 };
@@ -45,7 +119,9 @@ export type InvestmentGroup = (typeof investmentGroups)[number];
 export const investmentGroup = (id: Investment): InvestmentGroup =>
   ["tool", "basket", "sawmill", "quarry", "magnet"].includes(id)
     ? "採集"
-    : id === "bounty"
+    : ["bounty", "turret", "turretReach", "turretTwin", "collector"].includes(
+          id,
+        )
       ? "探索"
       : "運営";
 const perks: Record<
@@ -131,7 +207,17 @@ export class InvestmentSystem {
     });
   }
   get nearest() {
-    return [...investmentTiles]
+    return investmentTiles
+      .filter(
+        (t) =>
+          this.game.s.zone >= this.offer(t.id).unlock &&
+          !(
+            t.id === "conveyor" &&
+            this.production.conveyor &&
+            this.game.s.zone >= 1
+          ) &&
+          (!t.id.startsWith("turret") || t.id === "turret"),
+      )
       .sort(
         (a, b) =>
           Math.hypot(a.x - this.game.player.x, a.y - this.game.player.y) -
@@ -144,6 +230,21 @@ export class InvestmentSystem {
   }
   level(id: Perk) {
     return this.economy.perks?.[id] ?? 0;
+  }
+  machine(id: Machine) {
+    return this.economy.machines?.[id] ?? 0;
+  }
+  requires(id: Investment) {
+    const requirement = machineOffers[id as Machine]?.requires;
+    return (
+      !requirement ||
+      (requirement === "conveyor"
+        ? this.production.conveyor
+        : !!this.machine(requirement))
+    );
+  }
+  get beltSpeed() {
+    return this.production.conveyor ? (this.machine("fastbelt") ? 4 : 2) : 1;
   }
   get storageCapacity() {
     return 30 + this.level("depot") * 20;
@@ -172,6 +273,13 @@ export class InvestmentSystem {
   } {
     const s = this.game.s,
       e = this.economy;
+    if (id in machineOffers) {
+      return {
+        ...machineOffers[id as Machine],
+        level: this.machine(id as Machine),
+        max: 1,
+      };
+    }
     if (["conveyor", "hauler", "sawyer"].includes(id)) {
       const key = id as "conveyor" | "hauler" | "sawyer";
       return {
@@ -257,6 +365,7 @@ export class InvestmentSystem {
     const g = this.game,
       offer = this.offer(id);
     if (
+      !this.requires(id) ||
       offer.level >= offer.max ||
       g.s.resources.coin < offer.price ||
       g.s.zone < offer.unlock
@@ -268,6 +377,10 @@ export class InvestmentSystem {
     const e = this.economy;
     if (["conveyor", "hauler", "sawyer"].includes(id))
       this.production[id as "conveyor" | "hauler" | "sawyer"] = true;
+    if (id in machineOffers) {
+      e.machines ??= {};
+      e.machines[id as Machine] = 1;
+    }
     if (id === "carrier") e.carriers++;
     if (id === "waiter") e.waiter = true;
     if (id === "market") e.market++;
@@ -282,7 +395,9 @@ export class InvestmentSystem {
       tile,
       ["carrier", "waiter", "hauler", "sawyer"].includes(id)
         ? "仲間が加入！"
-        : "設備を強化！",
+        : id in machineOffers
+          ? "設備が完成！"
+          : "設備を強化！",
     );
     g.event("save", tile);
     return true;
@@ -381,7 +496,7 @@ export class InvestmentSystem {
       );
     }
     if (p.processing && working) {
-      p.clock += dt * (1 + this.level("sawmill") * 0.4) * (p.conveyor ? 2 : 1);
+      p.clock += dt * (1 + this.level("sawmill") * 0.4) * this.beltSpeed;
       if (p.clock >= 1.2 && p.output < this.outputCapacity) {
         p.processing = 0;
         p.clock = 0;

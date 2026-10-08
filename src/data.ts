@@ -112,7 +112,19 @@ export const freshProduction = (): Production => ({
   collecting: 0,
   collectionClock: 0,
 });
+export const machineIds = [
+  "turret",
+  "turretReach",
+  "turretTwin",
+  "drill",
+  "collector",
+  "fastbelt",
+] as const;
+export type Machine = (typeof machineIds)[number];
 export interface Economy {
+  machines?: Partial<Record<Machine, number>>;
+  drillStock?: number;
+  towerStock?: Partial<Record<Resource, number>>;
   production?: Production;
   perks?: Partial<Record<Perk, number>>;
   route?: "build" | "market";
@@ -238,6 +250,39 @@ export function load(raw: string | null): Save {
       ...v,
       economy: v.economy
         ? {
+            ...(v.economy.machines
+              ? {
+                  machines: Object.fromEntries(
+                    machineIds
+                      .filter((id) => id in v.economy.machines)
+                      .map((id) => [id, v.economy.machines[id] === 1 ? 1 : 0]),
+                  ),
+                }
+              : {}),
+            ...(v.economy.drillStock !== undefined
+              ? {
+                  drillStock: Number.isSafeInteger(v.economy.drillStock)
+                    ? Math.max(0, Math.min(500, v.economy.drillStock))
+                    : 0,
+                }
+              : {}),
+            ...(v.economy.towerStock
+              ? {
+                  towerStock: Object.fromEntries(
+                    Object.keys(resourceData)
+                      .filter((id) => id in v.economy.towerStock)
+                      .map((id) => [
+                        id,
+                        Number.isSafeInteger(v.economy.towerStock[id])
+                          ? Math.max(
+                              0,
+                              Math.min(2000, v.economy.towerStock[id]),
+                            )
+                          : 0,
+                      ]),
+                  ),
+                }
+              : {}),
             production: {
               ...freshProduction(),
               ...Object.fromEntries(

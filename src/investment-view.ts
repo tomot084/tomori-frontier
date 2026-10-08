@@ -1,6 +1,11 @@
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { Art, palette, worldPoint } from "./models";
-import { investmentTiles, customerPoint, marketPoint } from "./investments";
+import {
+  investmentTiles,
+  customerPoint,
+  marketPoint,
+  machineOffers,
+} from "./investments";
 import type { GameModel } from "./simulation";
 export class InvestmentView {
   waiter: ReturnType<Art["helper"]>;
@@ -13,6 +18,7 @@ export class InvestmentView {
     shadows: ShadowGenerator,
   ) {
     for (const tile of investmentTiles) {
+      if (tile.id in machineOffers) continue;
       const parts: import("@babylonjs/core/Meshes/mesh").Mesh[] = [];
       // Each investment has an original miniature prop, readable without a floating panel.
       if (["conveyor", "hauler", "sawyer"].includes(tile.id)) {

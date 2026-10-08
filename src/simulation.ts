@@ -1,3 +1,4 @@
+import { WorldMachines } from "./world-machines";
 import { stackHeight } from "./cargo";
 /** Engine-independent gameplay. Coordinates and save units remain identical to v1. */
 import {
@@ -23,6 +24,7 @@ import {
   sawPoint,
   tillPoint,
   marketPoint,
+  towerPoint,
 } from "./investments";
 const capFor = (kind: string, capacity: number) =>
   kind === "food" ? Math.floor(capacity / 2) : capacity;
@@ -57,6 +59,7 @@ export interface DropItem extends Point {
 }
 export interface GameEvent extends Point {
   type:
+    | "shot"
     | "flow"
     | "pickup"
     | "swing"
@@ -93,6 +96,7 @@ export class GameModel {
   readonly events: GameEvent[] = [];
   readonly crew = new LanternCrew(this);
   readonly investments = new InvestmentSystem(this);
+  readonly machines = new WorldMachines(this);
   player: Point;
   time = 0;
   direction = 0;
@@ -184,6 +188,55 @@ export class GameModel {
         }
       }
       placed.push(n);
+    }
+    const drillRock = this.nodes.find((n) => n.id === "node-1-13");
+    if (drillRock) {
+      drillRock.x = 235;
+      drillRock.y = 1120;
+    }
+    // Keep working machinery readable through the canopy; preserve IDs, yields and respawns.
+    const facilities = investmentTiles.filter((t) =>
+      ["turret", "drill", "collector"].includes(t.id),
+    );
+    for (const n of this.nodes.filter((n) => n.zone > 0 && n.kind === "wood")) {
+      if (
+        !facilities.some((site) => Math.hypot(site.x - n.x, site.y - n.y) < 125)
+      )
+        continue;
+      const slots = Array.from({ length: 9 }, (_, x) => 110 + x * 85).flatMap(
+        (x) =>
+          Array.from({ length: 6 }, (_, y) => ({
+            x,
+            y: n.zone * 550 + 260 + y * 80,
+          })),
+      );
+      const clear = (at: Point) =>
+        facilities.every(
+          (site) => Math.hypot(site.x - at.x, site.y - at.y) >= 125,
+        ) &&
+        investmentTiles.every(
+          (site) => Math.hypot(site.x - at.x, site.y - at.y) >= 85,
+        ) &&
+        camps.every((site) => Math.hypot(site.x - at.x, site.y - at.y) >= 90) &&
+        buildingData.every(
+          (site) => Math.hypot(450 - at.x, site.y - at.y) >= 110,
+        ) &&
+        this.nodes.every(
+          (other) =>
+            other === n ||
+            Math.hypot(other.x - at.x, other.y - at.y) >=
+              (other.kind === "wood" ? 110 : 85),
+        );
+      const at = slots
+        .filter(clear)
+        .sort(
+          (a, b) =>
+            Math.hypot(a.x - n.x, a.y - n.y) - Math.hypot(b.x - n.x, b.y - n.y),
+        )[0];
+      if (at) {
+        n.x = at.x;
+        n.y = at.y;
+      }
     }
     // Six reusable packs of eight per island; no actors are allocated on respawn.
     for (let z = 1; z <= 2; z++)
@@ -349,6 +402,31 @@ export class GameModel {
         vx: (Math.random() - 0.5) * 240,
         vy: (Math.random() - 0.5) * 240,
       });
+  }
+  damageEnemy(e: Enemy, damage: number) {
+    if (e.dead) return;
+    e.hp -= damage;
+    this.event("hit", e, { id: e.id, kind: "enemy" });
+    this.pop(e, `−${damage}`);
+    this.burst(e, enemyData[e.type].color, 3);
+    if (e.hp <= 0) this.defeatEnemy(e);
+  }
+  defeatEnemy(e: Enemy) {
+    e.dead = this.time + 5500 + (Number(e.id.split("-").at(-1)) % 8) * 160;
+    this.s.kills++;
+    this.combo = this.time - this.comboAt < 2200 ? this.combo + 1 : 1;
+    this.comboAt = this.time;
+    this.event("death", e, { id: e.id, kind: "enemy" });
+    this.spawn(
+      e,
+      "coin",
+      enemyData[e.type].drop + this.investments.level("bounty") * 2,
+    );
+    this.spawn(e, "food", 2);
+    this.burst(e, 0xffdc88, 6);
+    if (this.combo % 5 === 0)
+      this.pop(this.player, `${this.combo}連続撃破！`, 0xffdd83);
+    if (this.s.kills === 1) this.toast("灯貨を獲得！ 灯工房で道具を強化しよう");
   }
   rewardConstruction(i: number) {
     const b = buildingData[i],
@@ -531,24 +609,7 @@ export class GameModel {
         const push = e.hp <= 0 ? 35 : 9;
         e.x += Math.cos(angle) * push;
         e.y += Math.sin(angle) * push;
-        if (e.hp <= 0) {
-          e.dead = time + 5500 + (Number(e.id.split("-").at(-1)) % 8) * 160;
-          this.s.kills++;
-          this.combo = time - this.comboAt < 2200 ? this.combo + 1 : 1;
-          this.comboAt = time;
-          this.event("death", e, { id: e.id, kind: "enemy" });
-          this.spawn(
-            e,
-            "coin",
-            enemyData[e.type].drop + this.investments.level("bounty") * 2,
-          );
-          this.spawn(e, "food", 2);
-          this.burst(e, 0xffdc88, 6);
-          if (this.combo % 5 === 0)
-            this.pop(p, `${this.combo}連続撃破！`, 0xffdd83);
-          if (this.s.kills === 1)
-            this.toast("灯貨を獲得！ 灯工房で道具を強化しよう");
-        }
+        if (e.hp <= 0) this.defeatEnemy(e);
       }
     }
     for (let i = this.drops.length - 1; i >= 0; i--) {
@@ -568,7 +629,13 @@ export class GameModel {
         d.vy *= Math.exp(-dt * 3);
       } else if (
         distance < 230 + this.investments.level("magnet") * 40 &&
-        this.s.resources[d.kind] < cap
+        this.s.resources[d.kind] < cap &&
+        !(
+          this.investments.machine("collector") &&
+          (this.investments.economy.towerStock?.[d.kind] ?? 0) < 2000 &&
+          Math.hypot(d.x - towerPoint.x, d.y - towerPoint.y) <
+            Math.min(240, distance)
+        )
       ) {
         const move = Math.min(distance, dt * (340 + d.age * 220));
         d.x += ((p.x - d.x) / Math.max(1, distance)) * move;
@@ -615,6 +682,7 @@ export class GameModel {
         }
       }
     }
+    this.machines.step(dt);
     this.crew.step(dt);
     this.investments.step(dt);
     if (this.atCamp) this.s.hp = Math.min(st.hp, this.s.hp + 18 * dt);

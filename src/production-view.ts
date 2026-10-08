@@ -25,7 +25,11 @@ export class ProductionView {
     life: number;
   }[] = [];
   conveyor: TransformNode;
-  slats: Mesh[] = [];
+  slats: InstancedMesh[] = [];
+  chevrons: InstancedMesh[] = [];
+  lamps: Mesh[] = [];
+  fastMotor: Mesh;
+  beltTravel = 0;
   saw: Mesh;
   workpiece: InstancedMesh;
   finishedPiece: InstancedMesh;
@@ -47,6 +51,8 @@ export class ProductionView {
         0.36,
         palette.cut,
       ),
+      stone: art.resource("stone", "production-stone-source"),
+      food: art.resource("food", "production-food-source"),
       coin: art.resource("coin", "production-coin-source"),
     };
     for (const m of Object.values(this.sources)) {
@@ -74,7 +80,9 @@ export class ProductionView {
           ((row % 4) - 1.5) * (kind === "coin" ? 0.24 : 0.36),
         ).copyToArray(matrices, i * 16);
       }
-      mesh.position.copyFrom(worldPoint(at.x, at.y));
+      mesh.position.copyFrom(
+        worldPoint(at.x, at.y - (kind === "wood" ? 50 : 0)),
+      );
       if (kind === "wood") mesh.rotation.y = Math.PI / 2;
       if (kind === "coin") mesh.scaling.setAll(1.15);
       else mesh.scaling.setAll(kind === "wood" ? 1.45 : 1.25);
@@ -177,13 +185,15 @@ export class ProductionView {
         fittings.push(emblem);
       }
       const base = art.merge("stock-rack-" + kind, fittings);
-      base.position.copyFrom(worldPoint(at.x, at.y));
+      base.position.copyFrom(
+        worldPoint(at.x, at.y - (kind === "wood" ? 50 : 0)),
+      );
       const label = document.createElement("div");
       label.className = "line-label";
       overlay.append(label);
       this.labels.push(label);
     }
-    for (const kind of ["wood", "plank", "coin"])
+    for (const kind of ["wood", "plank", "coin", "stone", "food"])
       for (let i = 0; i < 24; i++) {
         const mesh = this.sources[kind].createInstance(`flow-${kind}-${i}`);
         mesh.setEnabled(false);
@@ -222,38 +232,102 @@ export class ProductionView {
       }
     }
     this.conveyor = new TransformNode("purchased-conveyor", art.scene);
-    const belt = art.box(
-      "teal-belt",
-      0,
-      0.56,
-      0,
-      2.5,
-      0.22,
-      0.72,
-      palette.teal,
-    );
+    const belt = art.box("teal-belt", 0, 0.72, 0, 4.8, 0.3, 1.85, palette.teal);
     belt.parent = this.conveyor;
-    for (let i = 0; i < 12; i++) {
-      const m = art.box(
-        "belt-slat",
-        i * 0.2 - 1.2,
-        0.7,
-        0,
-        0.09,
-        0.04,
-        0.7,
-        palette.cut,
-      );
+    const slatSource = art.box(
+      "belt-slat-source",
+      0,
+      0.9,
+      0,
+      0.09,
+      0.05,
+      1.75,
+      palette.cut,
+    );
+    slatSource.setEnabled(false);
+    for (let i = 0; i < 24; i++) {
+      const m = slatSource.createInstance(`belt-slat-${i}`);
+      m.position.set(i * 0.2 - 2.3, 0.9, 0);
       m.parent = this.conveyor;
+      m.isPickable = false;
       this.slats.push(m);
     }
-    for (const z of [-0.47, 0.47]) {
-      const m = art.box("belt-rail", 0, 0.72, z, 2.6, 0.12, 0.09, palette.gold);
+    for (const z of [-1, 1]) {
+      const m = art.box("belt-rail", 0, 0.9, z, 4.95, 0.18, 0.12, palette.gold);
       m.parent = this.conveyor;
     }
-    this.conveyor.position.copyFrom(
-      worldPoint((inputPoint.x + sawPoint.x) / 2, inputPoint.y),
-    );
+    // Wide roller chassis and repeated left-pointing chevrons make the feed readable at phone scale.
+    for (const x of [-2.3, 2.3]) {
+      const roller = art.cylinder(
+        "conveyor-end-roller",
+        x,
+        0.72,
+        0,
+        0.23,
+        0.23,
+        1.85,
+        palette.ink,
+      );
+      roller.rotation.x = Math.PI / 2;
+      roller.parent = this.conveyor;
+      for (const z of [-0.7, 0.7]) {
+        const foot = art.box(
+          "conveyor-leg",
+          x,
+          0.15,
+          z,
+          0.18,
+          1.1,
+          0.18,
+          palette.stone,
+        );
+        foot.parent = this.conveyor;
+      }
+    }
+    const arrowParts = [-1, 1].map((side) => {
+      const arrow = art.box(
+        "feed-chevron-half",
+        0,
+        0.94,
+        side * 0.24,
+        0.55,
+        0.045,
+        0.11,
+        palette.gold,
+      );
+      arrow.rotation.y = side * -0.65;
+      return arrow;
+    });
+    const arrowSource = art.merge("feed-chevron-source", arrowParts);
+    arrowSource.setEnabled(false);
+    for (let k = 0; k < 6; k++) {
+      const arrow = arrowSource.createInstance(`moving-feed-chevron-${k}`);
+      arrow.parent = this.conveyor;
+      arrow.isPickable = false;
+      this.chevrons.push(arrow);
+    }
+    for (const z of [-1.06, 1.06]) {
+      const lamp = art.box(
+        "belt-running-lamp",
+        1.2,
+        1.05,
+        z,
+        0.16,
+        0.18,
+        0.22,
+        palette.gold,
+      );
+      lamp.parent = this.conveyor;
+      this.lamps.push(lamp);
+    }
+    const fast = art.merge("fast-conveyor-motor", [
+      art.box("belt-turbo-motor", 0, 0.6, 1.23, 1.2, 0.7, 0.5, palette.gold),
+      art.box("motor-top", 0, 1.02, 1.23, 0.7, 0.12, 0.55, palette.ink),
+      art.box("speed-stripe", 0, 0.66, 1.51, 0.85, 0.16, 0.04, palette.cream),
+    ]);
+    fast.parent = this.conveyor;
+    this.fastMotor = fast;
+    this.conveyor.position.copyFrom(worldPoint(sawPoint.x, inputPoint.y, 0.4));
     this.conveyor.setEnabled(false);
     this.saw = art.cylinder(
       "working-saw",
@@ -289,6 +363,13 @@ export class ProductionView {
   }
   event(e: GameEvent) {
     if (e.type !== "flow") return;
+    if (
+      this.game.investments.production.conveyor &&
+      e.kind === "wood" &&
+      e.x === inputPoint.x &&
+      e.toX === sawPoint.x
+    )
+      return;
     const f = this.flights.find((f) => f.kind === e.kind && f.age >= f.life);
     if (!f) return;
     f.age = 0;
@@ -309,8 +390,14 @@ export class ProductionView {
         1.1 +
         Math.floor(Math.min(99, count) / 16) *
           (pile.kind === "wood" ? 0.6 : 0.23);
-      if (at(e.x, e.y)) f.from.y = height;
-      if (at(e.toX!, e.toY!)) f.to.y = height;
+      if (at(e.x, e.y)) {
+        f.from.y = height;
+        if (pile.kind === "wood") f.from.z += 1.25;
+      }
+      if (at(e.toX!, e.toY!)) {
+        f.to.y = height;
+        if (pile.kind === "wood") f.to.z += 1.25;
+      }
     }
     f.life = e.kind === "coin" ? 0.9 : 0.55;
     f.mesh.setEnabled(true);
@@ -351,9 +438,25 @@ export class ProductionView {
       );
     }
     this.conveyor.setEnabled(p.conveyor);
+    const working =
+      !!p.processing &&
+      (p.conveyor ||
+        p.sawyer ||
+        Math.hypot(
+          this.game.player.x - sawPoint.x,
+          this.game.player.y - sawPoint.y,
+        ) < 130);
+    if (working)
+      this.beltTravel +=
+        dt * (this.game.investments.machine("fastbelt") ? 2.8 : 1.4);
+    this.fastMotor.setEnabled(!!this.game.investments.machine("fastbelt"));
+    for (const lamp of this.lamps) lamp.setEnabled(working);
+    for (let k = 0; k < this.chevrons.length; k++)
+      this.chevrons[k].position.x =
+        ((((k * 0.8 - this.beltTravel) % 4.8) + 4.8) % 4.8) - 2.4;
     for (let i = 0; i < this.slats.length; i++)
       this.slats[i].position.x =
-        ((((i * 0.2 - time * 0.8) % 2.4) + 2.4) % 2.4) - 1.2;
+        ((((i * 0.2 - this.beltTravel) % 4.8) + 4.8) % 4.8) - 2.4;
     this.workpiece.setEnabled(
       !!p.processing &&
         Math.hypot(
@@ -366,7 +469,7 @@ export class ProductionView {
       worldPoint(
         inputPoint.x + (sawPoint.x - inputPoint.x) * beltPhase,
         inputPoint.y,
-        1.12,
+        p.conveyor ? 1.55 : 1.12,
       ),
     );
     this.workpiece.rotation.y = 0;
@@ -377,11 +480,11 @@ export class ProductionView {
         sawPoint.x +
           (outputPoint.x - sawPoint.x) * Math.max(0, (beltPhase - 0.45) / 0.55),
         sawPoint.y,
-        1.08,
+        p.conveyor ? 1.5 : 1.08,
       ),
     );
-    if (p.processing) this.saw.rotate(Vector3.Up(), dt * 12, 0);
-    this.saw.scaling.setAll(p.processing ? 1 + Math.sin(time * 28) * 0.05 : 1);
+    if (working) this.saw.rotate(Vector3.Up(), dt * 12, 0);
+    this.saw.scaling.setAll(working ? 1 + Math.sin(time * 28) * 0.05 : 1);
     for (const f of this.flights) {
       if (f.age >= f.life) {
         f.mesh.setEnabled(false);
@@ -405,7 +508,10 @@ export class ProductionView {
         count: p.mesh.thinInstanceCount,
         buffer: !!p.mesh.getVertexBuffer("world0")?.getBuffer(),
       })),
-      pooledInstances: 473,
+      pooledInstances: this.piles.length * 100 + this.flights.length + 2,
+      beltTravel: this.beltTravel,
+      fastMotor: this.fastMotor.isEnabled(),
+      working: this.lamps.some((lamp) => lamp.isEnabled()),
       conveyor: this.conveyor.isEnabled(),
     };
   }
