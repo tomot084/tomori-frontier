@@ -28,8 +28,8 @@ for (const viewport of [
     expect(rect?.height).toBeCloseTo(844, 0);
     await page.getByRole("button", { name: "設定" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    page.once("dialog", (d) => d.dismiss());
     await page.getByRole("button", { name: "セーブデータをリセット" }).click();
+    await page.getByRole("button", { name: "キャンセル" }).tap();
     await page.getByRole("button", { name: "戻る" }).click();
     expect(
       (await page.evaluate(() => (window as any).__game.state())).zone,

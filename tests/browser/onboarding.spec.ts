@@ -14,7 +14,7 @@ test("small deliveries fund an early tool upgrade and the workshop pauses play",
   await page.goto("?e2e");
   await page.getByRole("button", { name: "島へ降りる" }).click();
   await expect(page.locator("#goal b")).toContainText("木をあと5集めよう");
-  for (let delivery = 0; delivery < 2; delivery++) {
+  for (let delivery = 0; delivery < 1; delivery++) {
     await page.evaluate(() => {
       const g = (window as any).__game;
       const p = g

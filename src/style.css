@@ -1463,3 +1463,6 @@ dialog #close {
   border-color: #fff9e8;
   font-weight: 800;
 }
+
+#reset-confirm[hidden], #reset[hidden] { display: none; }
+#reset-execute { background: #b64c41; color: #fff9e7; }

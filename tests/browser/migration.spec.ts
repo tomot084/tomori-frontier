@@ -41,12 +41,12 @@ test("resumes existing Phaser v1 progress in 3D with bounded cargo and high-DPI 
   const stats = await p.evaluate(() => (window as any).__game.inspect());
   expect(stats.renderer).toBe("Babylon.js WebGL");
   expect(stats.orthographic).toBe(true);
-  expect(stats.cargo.wood).toBe(18);
-  expect(stats.cargo.stone).toBe(4);
+  expect(stats.cargo.wood).toBe(12);
+  expect(stats.cargo.stone).toBe(11);
   expect(stats.internalSize[0]).toBeLessThanOrEqual(488);
   expect(stats.internalSize[1]).toBeLessThanOrEqual(1056);
   expect(stats.particles).toBeLessThanOrEqual(48);
-  expect(stats.meshes).toBeLessThan(1100);
+  expect(stats.meshes).toBeLessThan(1400);
   await p.screenshot({ path: "screenshots/3d-legacy-save.png" });
   await context.close();
 });

@@ -1,3 +1,4 @@
+import { stackHeight } from "./cargo";
 import { cost, stats, freshProduction, type Economy, type Perk } from "./data";
 import type { GameModel, Point } from "./simulation";
 export type Investment =
@@ -34,6 +35,7 @@ investmentTiles.push(
   { id: "hauler", name: "運搬係", x: 700, y: 430, color: 0x86aec1 },
   { id: "sawyer", name: "製材担当", x: 300, y: 330, color: 0xc98d60 },
 );
+export const inputCapacity = 10000;
 export const inputPoint = { x: 465, y: 430 };
 export const sawPoint = { x: 380, y: 430 };
 export const outputPoint = { x: 295, y: 430 };
@@ -73,7 +75,7 @@ const perks: Record<
   },
   magnet: {
     base: 5,
-    effect: (l) => `資源の回収範囲 ${160 + 40 * l} → ${200 + 40 * l}`,
+    effect: (l) => `資源の回収範囲 ${230 + 40 * l} → ${270 + 40 * l}`,
     benefit: "散った素材を遠くから回収したい",
   },
   bounty: {
@@ -211,7 +213,7 @@ export class InvestmentSystem {
         max: 5,
         effect:
           s.levels.gather === 0
-            ? "木を2撃 → 1撃・採集速度 +25%"
+            ? "木を2撃 → 1撃・採集速度 +65%・収量3倍"
             : "採集の威力と速度をアップ",
         benefit: "自分でたくさん採りたい",
       };
@@ -220,8 +222,8 @@ export class InvestmentSystem {
         unlock: 0,
         price: cost(s, "capacity"),
         level: s.levels.capacity,
-        max: 5,
-        effect: `素材容量 ${stats(s).capacity} → ${stats(s).capacity + 20}`,
+        max: 3,
+        effect: `素材容量 ${stats(s).capacity} → ${stats({ ...s, levels: { ...s.levels, capacity: Math.min(3, s.levels.capacity + 1) } }).capacity}`,
         benefit: "往復を減らしたい",
       };
     if (id === "carrier")
@@ -326,14 +328,18 @@ export class InvestmentSystem {
     if (
       near(inputPoint) &&
       g.s.resources.wood &&
-      p.input < 200 &&
+      p.input < inputCapacity &&
       this.unloadClock >= interval
     ) {
       this.unloadClock = 0;
-      const height =
-        1.4 + Math.floor((Math.min(100, g.s.resources.wood) - 1) / 2) * 0.425;
-      g.s.resources.wood--;
-      p.input++;
+      const height = 1.4 + stackHeight(g.s.resources.wood) * 1.25;
+      const batch = Math.min(
+        g.s.resources.wood,
+        inputCapacity - p.input,
+        g.s.resources.wood <= 40 ? 1 : Math.ceil(g.s.resources.wood / 18),
+      );
+      g.s.resources.wood -= batch;
+      p.input += batch;
       this.transfer(
         g.player,
         inputPoint,
@@ -450,8 +456,8 @@ export class InvestmentSystem {
         customerPoint,
         "plank",
         1.4 +
-          Math.ceil(Math.min(100, g.s.resources.wood) / 2) * 0.425 +
-          Math.floor(p.carried / 2) * 0.3,
+          stackHeight(g.s.resources.wood) * 1.25 +
+          stackHeight(p.carried, 0.24) * 1.25,
       );
       this.sale(customerPoint);
     } else if (

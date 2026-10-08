@@ -55,7 +55,7 @@ it("capacity investment reduces round trips without forcing a tool upgrade, and 
   const g = new GameModel(fresh());
   g.s.resources.coin = 5;
   expect(g.investments.buy("basket")).toBe(true);
-  expect(stats(g.s).capacity).toBe(40);
+  expect(stats(g.s).capacity).toBe(2000);
   expect(g.s.levels.gather).toBe(0);
   expect(g.investments.buy("carrier")).toBe(false);
   expect(g.s.resources.coin).toBe(0);

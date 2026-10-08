@@ -1,3 +1,4 @@
+import { stackHeight } from "./cargo";
 /** Engine-independent gameplay. Coordinates and save units remain identical to v1. */
 import {
   buildingData,
@@ -50,6 +51,7 @@ export interface DropItem extends Point {
   id: string;
   kind: Resource;
   age: number;
+  amount: number;
   vx: number;
   vy: number;
 }
@@ -101,6 +103,9 @@ export class GameModel {
   saveAt = 0;
   foodAt = 0;
   hitUntil = 0;
+  hurtAt = 0;
+  combo = 0;
+  comboAt = 0;
   dropId = 0;
   constructor(public s: Save) {
     this.player = { x: s.x, y: s.y };
@@ -180,11 +185,18 @@ export class GameModel {
       }
       placed.push(n);
     }
+    // Six reusable packs of eight per island; no actors are allocated on respawn.
     for (let z = 1; z <= 2; z++)
-      for (let i = 0; i < 7; i++) {
-        const type = i % 3,
-          x = 180 + (i % 3) * 230,
-          y = 870 + (z - 1) * 550 + Math.floor(i / 3) * 125;
+      for (let i = 0; i < 48; i++) {
+        const pack = Math.floor(i / 8),
+          slot = i % 8;
+        const type = slot % 3;
+        const x = 180 + (pack % 3) * 220 + Math.cos((slot * Math.PI) / 4) * 48;
+        const y =
+          870 +
+          (z - 1) * 550 +
+          Math.floor(pack / 3) * 240 +
+          Math.sin((slot * Math.PI) / 4) * 48;
         this.enemies.push({
           id: `enemy-${z}-${i}`,
           type,
@@ -195,7 +207,7 @@ export class GameModel {
           zone: z,
           hp: enemyData[type].hp,
           dead: 0,
-          cool: 0,
+          cool: i * 90,
         });
       }
   }
@@ -305,15 +317,35 @@ export class GameModel {
     return true;
   }
   spawn(at: Point, kind: Resource, n: number) {
-    for (let i = 0; i < n && this.drops.length < 64; i++)
+    // A bounded number of moving pickups carries the entire reward, even at saturation.
+    const pieces = Math.min(n, 16, 128 - this.drops.length);
+    if (!pieces) {
+      const existing = this.drops.find((d) => d.kind === kind);
+      if (existing) existing.amount += n;
+      else {
+        // Merge a pair of another kind to reserve a slot for this new reward.
+        const first = this.drops[0];
+        const index = this.drops.findIndex(
+          (d, i) => i > 0 && d.kind === first.kind,
+        );
+        if (index >= 0) {
+          first.amount += this.drops[index].amount;
+          this.drops.splice(index, 1);
+          this.spawn(at, kind, n);
+        }
+      }
+      return;
+    }
+    for (let i = 0; i < pieces; i++)
       this.drops.push({
         id: `drop-${this.dropId++}`,
         x: at.x,
         y: at.y,
         kind,
+        amount: Math.floor(n / pieces) + (i < n % pieces ? 1 : 0),
         age: 0,
-        vx: (Math.random() - 0.5) * 160,
-        vy: -50 - Math.random() * 70,
+        vx: (Math.random() - 0.5) * 240,
+        vy: (Math.random() - 0.5) * 240,
       });
   }
   rewardConstruction(i: number) {
@@ -417,7 +449,7 @@ export class GameModel {
           this.spawn(
             n,
             n.kind,
-            gatherableData[n.kind].yield +
+            gatherableData[n.kind].yield * (1 + this.s.levels.gather * 2) +
               (this.s.zone >= 2 ? 2 : 0) +
               this.investments.resourceBonus(n.kind),
           );
@@ -434,7 +466,8 @@ export class GameModel {
         this.event("respawn", n, { id: n.id });
       }
     let nearest: Enemy | undefined,
-      dist = Infinity;
+      dist = Infinity,
+      chasing = 0;
     const safe = this.atCamp;
     for (const e of this.enemies) {
       if (e.zone > this.s.zone) continue;
@@ -450,16 +483,23 @@ export class GameModel {
       }
       const d = enemyData[e.type],
         distance = Math.hypot(e.x - p.x, e.y - p.y);
+      if (distance > 620) continue; // Distant packs do no AI work.
       if (distance < dist) {
         dist = distance;
         nearest = e;
       }
-      if (distance < 145 && distance > d.range && !safe) {
+      if (distance < 260 && distance > d.range && !safe && chasing++ < 8) {
         e.x += ((p.x - e.x) / distance) * d.speed * dt;
         e.y += ((p.y - e.y) / distance) * d.speed * dt;
       }
-      if (distance < d.range + 6 && time > e.cool && !safe) {
-        e.cool = time + 1200;
+      if (
+        distance < d.range + 6 &&
+        time > e.cool &&
+        time > this.hurtAt &&
+        !safe
+      ) {
+        e.cool = time + 1600;
+        this.hurtAt = time + 350;
         this.s.hp -= d.attack;
         this.event("hit", p, { id: "player", kind: "enemy" });
         this.pop(p, `−${d.attack}`, 0xff8d7c);
@@ -471,31 +511,42 @@ export class GameModel {
         }
       }
     }
-    if (nearest && dist < 75 && time > this.attackAt) {
-      this.attackAt = time + 650;
-      const e = nearest;
-      this.event("swing", e, { kind: "enemy" });
-      e.hp -= st.attack;
-      this.event("hit", e, { id: e.id, kind: "enemy" });
-      this.hitUntil = time + 45;
-      this.pop(e, `−${st.attack}`);
-      this.burst(e, enemyData[e.type].color, 8);
-      const angle = Math.atan2(e.y - p.y, e.x - p.x);
-      e.x += Math.cos(angle) * 13;
-      e.y += Math.sin(angle) * 13;
-      if (e.hp <= 0) {
-        e.dead = time + 24000;
-        this.s.kills++;
-        this.event("death", e, { id: e.id, kind: "enemy" });
-        this.spawn(
-          e,
-          "coin",
-          enemyData[e.type].drop + this.investments.level("bounty") * 2,
-        );
-        this.spawn(e, "food", 2);
-        this.burst(e, 0xffdc88, 12);
-        if (this.s.kills === 1)
-          this.toast("灯貨を獲得！ 灯工房で道具を強化しよう");
+    if (!safe && nearest && dist < 108 && time > this.attackAt) {
+      this.attackAt = time + 380;
+      this.event("swing", nearest, { kind: "enemy" });
+      for (const e of this.enemies) {
+        if (
+          e.dead ||
+          e.zone > this.s.zone ||
+          Math.hypot(e.x - p.x, e.y - p.y) >= 108
+        )
+          continue;
+        e.hp -= st.attack;
+        this.event("hit", e, { id: e.id, kind: "enemy" });
+        this.pop(e, `−${st.attack}`);
+        this.burst(e, enemyData[e.type].color, 4);
+        const angle = Math.atan2(e.y - p.y, e.x - p.x);
+        const push = e.hp <= 0 ? 35 : 9;
+        e.x += Math.cos(angle) * push;
+        e.y += Math.sin(angle) * push;
+        if (e.hp <= 0) {
+          e.dead = time + 5500 + (Number(e.id.split("-").at(-1)) % 8) * 160;
+          this.s.kills++;
+          this.combo = time - this.comboAt < 2200 ? this.combo + 1 : 1;
+          this.comboAt = time;
+          this.event("death", e, { id: e.id, kind: "enemy" });
+          this.spawn(
+            e,
+            "coin",
+            enemyData[e.type].drop + this.investments.level("bounty") * 2,
+          );
+          this.spawn(e, "food", 2);
+          this.burst(e, 0xffdc88, 6);
+          if (this.combo % 5 === 0)
+            this.pop(p, `${this.combo}連続撃破！`, 0xffdd83);
+          if (this.s.kills === 1)
+            this.toast("灯貨を獲得！ 灯工房で道具を強化しよう");
+        }
       }
     }
     for (let i = this.drops.length - 1; i >= 0; i--) {
@@ -508,21 +559,24 @@ export class GameModel {
               ? Math.floor(st.capacity / 2)
               : st.capacity,
         distance = Math.hypot(d.x - p.x, d.y - p.y);
-      if (d.age < 0.3) {
+      if (d.age < 0.22) {
         d.x += d.vx * dt;
         d.y += d.vy * dt;
-        d.vy += 300 * dt;
+        d.vx *= Math.exp(-dt * 3);
+        d.vy *= Math.exp(-dt * 3);
       } else if (
-        distance < 160 + this.investments.level("magnet") * 40 &&
+        distance < 230 + this.investments.level("magnet") * 40 &&
         this.s.resources[d.kind] < cap
       ) {
-        const move = Math.min(distance, dt * (180 + d.age * 80));
+        const move = Math.min(distance, dt * (340 + d.age * 220));
         d.x += ((p.x - d.x) / Math.max(1, distance)) * move;
         d.y += ((p.y - d.y) / Math.max(1, distance)) * move;
         if (distance < 15) {
-          this.s.resources[d.kind]++;
-          this.event("pickup", p, { kind: d.kind, count: 1 });
-          this.drops.splice(i, 1);
+          const amount = Math.min(d.amount, cap - this.s.resources[d.kind]);
+          this.s.resources[d.kind] += amount;
+          this.event("pickup", p, { kind: d.kind, count: amount });
+          d.amount -= amount;
+          if (!d.amount) this.drops.splice(i, 1);
           continue;
         }
       }
@@ -541,7 +595,9 @@ export class GameModel {
             p,
             { x: 450, y: b.y },
             "plank",
-            1.4 + Math.floor(line.carried / 2) * 0.22,
+            1.4 +
+              stackHeight(this.s.resources.wood) * 1.25 +
+              stackHeight(line.carried, 0.24) * 1.25,
           );
           this.rewardConstruction(i);
           this.finishConstruction(i);

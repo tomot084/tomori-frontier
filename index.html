@@ -118,8 +118,13 @@
       </p>
       <button id="feedback">音・完成時の振動：ON</button>
       <button id="quality">描画品質：標準</button
-      ><button id="reset">セーブデータをリセット</button
-      ><button id="close">戻る</button>
+      ><button id="reset">セーブデータをリセット</button>
+      <div id="reset-confirm" hidden>
+        <p>セーブデータをリセットしますか？</p>
+        <button id="reset-cancel">キャンセル</button>
+        <button id="reset-execute">リセットを実行</button>
+      </div>
+      <button id="close">戻る</button>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -65,9 +65,9 @@ describe("progression", () => {
 it("caps upgrade levels and keeps currency on rejected purchases", () => {
   const s = fresh();
   s.resources.coin = 10000;
-  for (let i = 0; i < 5; i++) expect(upgrade(s, "capacity")).toBe(true);
+  for (let i = 0; i < 3; i++) expect(upgrade(s, "capacity")).toBe(true);
   const saved = JSON.stringify(s);
   expect(upgrade(s, "capacity")).toBe(false);
   expect(JSON.stringify(s)).toBe(saved);
-  expect(stats(s).capacity).toBe(120);
+  expect(stats(s).capacity).toBe(10000);
 });

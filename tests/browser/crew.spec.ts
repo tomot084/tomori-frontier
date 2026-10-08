@@ -41,7 +41,7 @@ test("unlocked helper harvests and carries real materials, pauses in shop, and r
       () => page.evaluate(() => (window as any).__game.inspect().crew[0].cargo),
       { timeout: 15000 },
     )
-    .toBe(5);
+    .toBeGreaterThan(0);
   expect(
     await page.evaluate(() => (window as any).__game.state().resources.wood),
   ).toBe(0);

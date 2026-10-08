@@ -1,4 +1,4 @@
-import { inputPoint } from "./investments";
+import { inputPoint, inputCapacity } from "./investments";
 import { buildingData, gatherableData } from "./data";
 import type { GameModel, Point } from "./simulation";
 export interface LanternWorker extends Point {
@@ -162,7 +162,7 @@ export class LanternCrew {
         if (w.clock >= 0.18) {
           w.clock = 0;
           if (market) {
-            if (g.investments.production.input >= 200) continue;
+            if (g.investments.production.input >= inputCapacity) continue;
             g.investments.production.input++;
             g.investments.transfer(w, inputPoint, "wood", 1 + w.cargo * 0.25);
             g.burst(inputPoint, 0xe4b577, 1);

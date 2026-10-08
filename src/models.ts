@@ -981,6 +981,13 @@ export class Art {
     cargoRoot.position.set(0, 1.12, -0.62);
     const cargoSource = this.log("cargo-log-source");
     cargoSource.setEnabled(false);
+    const stoneSource = this.rock(
+      "cargo-stone-source",
+      0.33,
+      palette.stoneLight,
+      0,
+    );
+    stoneSource.setEnabled(false);
     const wood = Array.from({ length: maxCargo }, (_, i) => {
         const m = cargoSource.createInstance("carried-log-" + i);
         m.scaling.x = 1.35;
@@ -994,8 +1001,8 @@ export class Art {
         m.setEnabled(false);
         return m;
       }),
-      stone = Array.from({ length: 4 }, (_, i) => {
-        const m = this.rock("carried-stone-" + i, 0.33, palette.stoneLight, i);
+      stone = Array.from({ length: maxCargo }, (_, i) => {
+        const m = stoneSource.createInstance("carried-stone-" + i);
         m.parent = cargoRoot;
         m.position.set(((i % 2) - 0.5) * 0.31, Math.floor(i / 2) * 0.3, 0.39);
         m.setEnabled(false);

@@ -7,16 +7,16 @@ export const resourceData = {
   coin: { name: "灯貨", icon: "✦", color: 0xffdd83 },
 };
 export const gatherableData = {
-  wood: { hp: 6, yield: 5, tool: "斧", respawn: 18 },
-  stone: { hp: 9, yield: 5, tool: "鎚", respawn: 22 },
-  food: { hp: 3, yield: 3, tool: "手", respawn: 15 },
+  wood: { hp: 6, yield: 20, tool: "斧", respawn: 7 },
+  stone: { hp: 9, yield: 15, tool: "鎚", respawn: 8 },
+  food: { hp: 3, yield: 6, tool: "手", respawn: 6 },
 };
 export const enemyData = [
   {
     id: "mote",
     name: "霧ころ",
-    hp: 12,
-    attack: 4,
+    hp: 6,
+    attack: 2,
     speed: 48,
     range: 28,
     color: 0xb5a4cc,
@@ -25,8 +25,8 @@ export const enemyData = [
   {
     id: "shell",
     name: "苔かぶと",
-    hp: 32,
-    attack: 7,
+    hp: 9,
+    attack: 3,
     speed: 28,
     range: 32,
     color: 0x86a998,
@@ -35,9 +35,9 @@ export const enemyData = [
   {
     id: "dart",
     name: "宵ばね",
-    hp: 9,
-    attack: 3,
-    speed: 90,
+    hp: 3,
+    attack: 2,
+    speed: 76,
     range: 25,
     color: 0xe6a57b,
     drop: 6,
@@ -48,10 +48,18 @@ export const upgradeData: Record<
   { name: string; base: number; description: string }
 > = {
   attack: { name: "灯刃", base: 8, description: "攻撃 +2" },
-  gather: { name: "道具", base: 7, description: "木を一撃で採集 · 速度 +25%" },
+  gather: {
+    name: "道具",
+    base: 7,
+    description: "採集威力・速度・収量を大幅強化",
+  },
   speed: { name: "旅靴", base: 6, description: "移動 +12%" },
   health: { name: "灯衣", base: 6, description: "最大HP +20" },
-  capacity: { name: "背かご", base: 5, description: "容量 +20" },
+  capacity: {
+    name: "背かご",
+    base: 5,
+    description: "容量 500 → 2000 → 5000 → 10000",
+  },
 };
 export const buildingData: Building[] = [
   { name: "芽渡り橋", y: 730, cost: { wood: 20, stone: 10, food: 0 }, zone: 1 },
@@ -163,11 +171,12 @@ export interface Building extends UnlockZone {
 }
 export const stats = (s: Save): PlayerStats => ({
   attack: 3 + s.levels.attack * 2,
-  gather: 650 / (1 + s.levels.gather * 0.25),
-  speed: 130 * (1 + s.levels.speed * 0.12),
+  gather: 420 / (1 + s.levels.gather * 0.65),
+  speed: 182 * (1 + s.levels.speed * 0.12),
   hp: 80 + s.levels.health * 20,
-  capacity: 20 + s.levels.capacity * 20,
+  capacity: [500, 2000, 5000, 10000, 10000, 10000][s.levels.capacity],
 });
+export const upgradeLimit = (u: Upgrade) => (u === "capacity" ? 3 : 5);
 export const cost = (s: Save, u: Upgrade) =>
   Math.ceil(upgradeData[u].base * 1.55 ** s.levels[u]);
 export function deposit(s: Save, index: number, r: "wood" | "stone" | "food") {
@@ -186,7 +195,7 @@ export function complete(s: Save, index: number) {
 }
 export function upgrade(s: Save, u: Upgrade) {
   const c = cost(s, u);
-  if (s.resources.coin < c || s.levels[u] >= 5) return false;
+  if (s.resources.coin < c || s.levels[u] >= upgradeLimit(u)) return false;
   s.resources.coin -= c;
   s.levels[u]++;
   if (u === "health") s.hp = stats(s).hp;

@@ -49,7 +49,9 @@ function boot() {
       view.syncSites();
     }
   });
+  let resetting = false;
   function persist() {
+    if (resetting) return;
     model.s.x = model.player.x;
     model.s.y = model.player.y;
     try {
@@ -88,11 +90,30 @@ function boot() {
     release();
     (el("config") as HTMLDialogElement).showModal();
   };
-  el("close").onclick = () => (el("config") as HTMLDialogElement).close();
+  el("close").onclick = () => {
+    el("reset-confirm").hidden = true;
+    el("reset").hidden = false;
+    (el("config") as HTMLDialogElement).close();
+  };
   el("reset").onclick = () => {
-    if (confirm("この島の進行をすべて消して、最初から始めますか？")) {
+    el("reset-confirm").hidden = false;
+    el("reset").hidden = true;
+  };
+  el("reset-cancel").onclick = () => {
+    el("reset-confirm").hidden = true;
+    el("reset").hidden = false;
+  };
+  el("reset-execute").onclick = () => {
+    resetting = true;
+    release();
+    try {
       localStorage.removeItem(KEY);
       location.reload();
+    } catch {
+      resetting = false;
+      ui.toast(
+        "保存領域を削除できませんでした。ブラウザの設定を確認してください",
+      );
     }
   };
   const paintFeedback = () => {
@@ -116,6 +137,7 @@ function boot() {
     view.shadows.getShadowMap()!.refreshRate = low ? 2 : 1;
     el("quality").textContent = `描画品質：${low ? "軽量" : "標準"}`;
     view.resize();
+    view.scene.render();
   };
   window.addEventListener("blur", () => {
     release();
@@ -193,13 +215,13 @@ function boot() {
       for (let remaining = delta; remaining > 0; remaining -= 60)
         model.step(Math.min(remaining, 60), input);
     }
+    const picked = new Set<string>();
     for (const event of model.events.splice(0)) {
       if (event.type === "toast") ui.toast(event.text!);
       else if (event.type === "save") persist();
       else {
         if (event.type === "pickup") {
-          ui.update(started);
-          ui.pulse(event.kind!);
+          picked.add(event.kind!);
         }
         view.effects(event);
         feedback.play(event);
@@ -207,6 +229,10 @@ function boot() {
         if (event.type === "deposit" || event.type === "complete")
           view.syncSites();
       }
+    }
+    if (picked.size) {
+      ui.update(started);
+      for (const kind of picked) ui.pulse(kind);
     }
     if (now > uiAt) {
       uiAt = now + 200;
@@ -223,6 +249,7 @@ function boot() {
       view.shadows.mapSize = 512;
       view.shadows.getShadowMap()!.refreshRate = 2;
       view.resize();
+      view.scene.render();
       el("quality").textContent = "描画品質：軽量";
     }
   });

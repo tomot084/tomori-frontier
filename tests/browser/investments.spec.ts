@@ -71,13 +71,14 @@ for (const size of [
       await pos(n.x, n.y);
       await expect
         .poll(async () => (await state()).resources.wood, { timeout: 30000 })
-        .toBeGreaterThan(count);
+        .toBeGreaterThanOrEqual(count + 20);
       await page.waitForTimeout(500);
     }
+    await pos(450, 360);
     await expect.poll(async () => (await state()).resources.wood).toBe(20);
     expect(
       await page.evaluate(() => (window as any).__game.inspect().cargo.wood),
-    ).toBe(20);
+    ).toBe(12);
     await page.screenshot({ path: `screenshots/loop-stack-${size.width}.png` });
     await pos(465, 430);
     await expect

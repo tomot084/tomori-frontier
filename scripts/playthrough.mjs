@@ -81,7 +81,7 @@ try {
     while ((await read()).zone === index) {
       for (const r of ["wood", "stone", "food"]) {
         const s = await read(),
-          cap = 20 + s.levels.capacity * 10,
+          cap = [500, 2000, 5000, 10000, 10000, 10000][s.levels.capacity],
           remaining = b.cost[r] - s.progress[index][r];
         if (remaining > 0)
           await collect(

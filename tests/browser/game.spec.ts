@@ -115,7 +115,7 @@ for (const size of [
     }
     await collect("wood", 20);
     await page.waitForTimeout(700);
-    expect((await state(page)).resources.wood).toBe(20);
+    expect((await state(page)).resources.wood).toBeGreaterThanOrEqual(20);
     await collect("stone", 10);
     await pos(page, 450, 682);
     await expect

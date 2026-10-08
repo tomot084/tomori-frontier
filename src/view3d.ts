@@ -1,3 +1,4 @@
+import { visualStack, stackHeight, stackBulk } from "./cargo";
 import { ProductionView } from "./production-view";
 import { InvestmentView } from "./investment-view";
 import { customerPoint } from "./investments";
@@ -24,7 +25,7 @@ import { GameModel, type GameEvent, type Point } from "./simulation";
 import { buildingData, enemyData, resourceData } from "./data";
 interface Actor {
   root: TransformNode;
-  mesh: Mesh;
+  mesh: AbstractMesh;
   shadow: Mesh;
   hitAt: number;
   dieAt: number;
@@ -136,6 +137,8 @@ export class WorldView {
   rig: ReturnType<Art["player"]>;
   scenery: ReturnType<typeof makeScenery>;
   actors = new Map<string, Actor>();
+  effectPools = new Map<string, Mesh[]>();
+  pooledEffects = 0;
   dropMeshes = new Map<string, AbstractMesh>();
   dropPools: Record<string, AbstractMesh[]> = {};
   dropSources: Record<string, Mesh> = {};
@@ -305,9 +308,14 @@ export class WorldView {
         stump.freezeWorldMatrix();
       }
     }
+    const enemySources = enemyData.map((_, type) => {
+      const mesh = this.art.enemy(type);
+      mesh.setEnabled(false);
+      return mesh;
+    });
     for (const e of model.enemies) {
       const root = new TransformNode(e.id, this.scene);
-      const mesh = this.art.enemy(e.type);
+      const mesh = enemySources[e.type].createInstance(e.id + "-body");
       mesh.parent = root;
       const shadow = this.shadow(e.type === 1 ? 1.25 : 0.95);
       this.actors.set(e.id, {
@@ -432,7 +440,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 8.7 : 9.1;
+    const halfHeight = ratio < 0.8 ? 11.1 : 11.6;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -540,16 +548,18 @@ export class WorldView {
       if (event.id === "player" || event.kind === "enemy")
         this.shakeUntil = this.time + 0.14;
       if (event.id !== "player" && this.particles.length < 48) {
-        const flash = this.art.sphere(
-          "impact-star",
-          0,
-          0,
-          0,
-          0.7,
-          0.7,
-          0.16,
-          0xffedaa,
-          true,
+        const flash = this.effectMesh("impact-star", () =>
+          this.art.sphere(
+            "impact-star",
+            0,
+            0,
+            0,
+            0.7,
+            0.7,
+            0.16,
+            0xffedaa,
+            true,
+          ),
         );
         flash.position.copyFrom(
           worldPoint(event.x, event.y, event.kind === "wood" ? 1.5 : 0.8),
@@ -603,19 +613,46 @@ export class WorldView {
       this.syncCargo();
     }
   }
+  effectMesh(key: string, create: () => Mesh) {
+    const mesh = this.effectPools.get(key)?.pop();
+    if (mesh) this.pooledEffects--;
+    const result = mesh ?? create();
+    result.metadata = { poolKey: key };
+    result.scaling.setAll(1);
+    result.rotation.setAll(0);
+    result.setEnabled(true);
+    return result;
+  }
+  recycleEffect(mesh: Mesh) {
+    if (this.pooledEffects >= 128) {
+      if (mesh.metadata?.ripple) mesh.material?.dispose();
+      mesh.dispose();
+      return;
+    }
+    mesh.setEnabled(false);
+    const key = mesh.metadata.poolKey;
+    const pool = this.effectPools.get(key) ?? [];
+    pool.push(mesh);
+    this.effectPools.set(key, pool);
+    this.pooledEffects++;
+  }
   pulse(origin: Vector3, hex: number, life: number, size: number) {
     if (this.particles.length >= 48) return;
-    const mesh = MeshBuilder.CreateTorus(
-      "reward-ripple",
-      { diameter: 1, thickness: 0.045, tessellation: 24 },
-      this.scene,
+    const mesh = this.effectMesh("ripple-" + hex, () =>
+      MeshBuilder.CreateTorus(
+        "reward-ripple",
+        { diameter: 1, thickness: 0.045, tessellation: 24 },
+        this.scene,
+      ),
     );
-    const mat = new StandardMaterial("ripple-light", this.scene);
+    const mat =
+      (mesh.material as StandardMaterial) ??
+      new StandardMaterial("ripple-light", this.scene);
     mat.disableLighting = true;
     mat.emissiveColor = color(hex);
     mat.alpha = 0.85;
     mesh.material = mat;
-    mesh.metadata = { ripple: true, size };
+    mesh.metadata = { ...mesh.metadata, ripple: true, size };
     this.particles.push({
       mesh,
       origin,
@@ -653,15 +690,18 @@ export class WorldView {
   burst(e: GameEvent) {
     const count = Math.min(e.count || 6, 48 - this.particles.length);
     for (let i = 0; i < count; i++) {
-      const mesh =
-        e.kind === "wood"
-          ? this.art.log("flying-wood-chip")
-          : this.art.rock(
-              "impact-fragment",
-              0.07 + Math.random() * 0.07,
-              e.color || palette.gold,
-              i,
-            );
+      const mesh = this.effectMesh(
+        e.kind === "wood" ? "wood-chip" : "fragment-" + e.color,
+        () =>
+          e.kind === "wood"
+            ? this.art.log("flying-wood-chip")
+            : this.art.rock(
+                "impact-fragment",
+                0.07 + Math.random() * 0.07,
+                e.color || palette.gold,
+                i,
+              ),
+      );
       if (e.kind === "wood") mesh.scaling.setAll(0.55);
       const origin = worldPoint(e.x, e.y, 1.2);
       mesh.position.copyFrom(origin);
@@ -681,7 +721,9 @@ export class WorldView {
   }
   flyingDeposit(e: GameEvent) {
     if (this.particles.length >= 48) return;
-    const mesh = this.art.resource(e.kind || "wood", "delivered-resource");
+    const mesh = this.effectMesh("delivery-" + e.kind, () =>
+      this.art.resource(e.kind || "wood", "delivered-resource"),
+    );
     const origin = worldPoint(e.x, e.y, 1.2),
       dest = worldPoint(450, buildingData[e.index!].y, 0.4);
     const velocity = dest.subtract(origin).scale(1 / 0.38);
@@ -692,30 +734,39 @@ export class WorldView {
       born: this.time,
       life: 0.38,
     });
-    mesh.metadata = { delivery: true };
+    mesh.metadata = { ...mesh.metadata, delivery: true };
   }
   syncCargo() {
     const s = this.model.s,
       key = `${s.resources.wood},${s.resources.stone},${s.resources.food},${this.model.investments.production.carried}`;
     if (key === this.lastInventory) return;
     this.lastInventory = key;
-    const wood = Math.min(100, s.resources.wood),
-      stone = Math.min(4, Math.ceil(s.resources.stone / 2));
-    this.rig.wood.forEach((m, i) => m.setEnabled(i < wood));
-    this.rig.planks.thinInstanceCount = Math.min(
-      100,
+    const wood = visualStack(s.resources.wood),
+      stone = visualStack(s.resources.stone);
+    const bulk = stackBulk(s.resources.wood);
+    this.rig.wood.forEach((m, i) => {
+      m.setEnabled(i < wood);
+      m.scaling.set(1.35 * bulk, 1 + (bulk - 1) * 0.16, 1 + (bulk - 1) * 0.16);
+    });
+    this.rig.planks.thinInstanceCount = visualStack(
+      this.model.investments.production.carried,
+    );
+    this.rig.planks.scaling.x = stackBulk(
       this.model.investments.production.carried,
     );
     this.rig.planks.position.y = Math.ceil(wood / 2) * 0.34;
     this.rig.planks.setEnabled(this.model.investments.production.carried > 0);
     this.rig.stone.forEach((m, i) => {
       m.setEnabled(i < stone);
+      m.scaling.setAll(Math.sqrt(stackBulk(s.resources.stone)));
       m.position.y =
         Math.ceil(wood / 2) * 0.34 +
-        Math.ceil(this.model.investments.production.carried / 2) * 0.24 +
+        Math.ceil(visualStack(this.model.investments.production.carried) / 2) *
+          0.24 +
         Math.floor(i / 2) * 0.29;
     });
     this.rig.food.setEnabled(s.resources.food > 0);
+    this.rig.food.scaling.setAll(1 + visualStack(s.resources.food) * 0.008);
   }
   syncSites() {
     this.scenery.sites.forEach((site, i) => {
@@ -813,11 +864,8 @@ export class WorldView {
     this.playerRing.position.y = 0.065;
     const cargoAge = this.time - this.cargoBounceAt;
     this.rig.cargoRoot.rotation.z = Math.sin(this.time * 6) * m.moving * 0.025;
-    for (
-      let i = 0;
-      i < Math.min(100, m.s.resources.wood + m.investments.production.carried);
-      i++
-    )
+    const visibleWood = visualStack(m.s.resources.wood);
+    for (let i = 0; i < visibleWood; i++)
       this.rig.wood[i].position.x =
         ((i % 2) - 0.5) * 0.34 +
         Math.sin(this.time * 6 - i * 0.12) *
@@ -882,7 +930,7 @@ export class WorldView {
     this.trail.position.copyFrom(p.root.position);
     this.trail.rotation.y = p.root.rotation.y;
     this.ring.scaling.setAll(1 + Math.sin(this.time * 18) * 0.025);
-    const casters: Mesh[] = this.rig.root
+    const casters: AbstractMesh[] = this.rig.root
         .getChildMeshes()
         .filter(
           (mesh) =>
@@ -951,6 +999,16 @@ export class WorldView {
             : 1;
       if (a.mesh.visibility > 0.9) casters.push(a.mesh);
     }
+    let engaged: (typeof m.enemies)[number] | undefined;
+    let engagedDistance = Infinity;
+    for (const e of m.enemies) {
+      if (e.dead || e.zone > m.s.zone) continue;
+      const distance = (e.x - m.player.x) ** 2 + (e.y - m.player.y) ** 2;
+      if (distance < engagedDistance) {
+        engaged = e;
+        engagedDistance = distance;
+      }
+    }
     for (const e of m.enemies) {
       const a = this.actors.get(e.id)!,
         age = this.time - a.dieAt,
@@ -962,7 +1020,11 @@ export class WorldView {
       a.root.setEnabled(visible);
       a.shadow.setEnabled(visible);
       const danger = this.dangerRings.get(e.id)!;
-      danger.setEnabled(visible && !dying);
+      danger.setEnabled(
+        visible &&
+          !dying &&
+          Math.hypot(e.x - m.player.x, e.y - m.player.y) < 180,
+      );
       danger.position.copyFrom(worldPoint(e.x, e.y, 0.06));
       danger.visibility =
         Math.hypot(e.x - m.player.x, e.y - m.player.y) < 230 ? 0.9 : 0.35;
@@ -986,8 +1048,11 @@ export class WorldView {
         1.22 - recoil * 0.16,
         1.22 + recoil * 0.18,
       );
-      if (dying) a.root.scaling.setAll(Math.max(0.01, 1 - age / 0.26));
-      a.mesh.rotation.z = recoil * 0.13;
+      if (dying) {
+        a.root.scaling.setAll(Math.max(0.01, 1.22 * (1 - age / 0.26)));
+        a.root.position.y += Math.sin((age / 0.26) * Math.PI) * 1.4;
+      }
+      a.mesh.rotation.z = dying ? age * 12 : recoil * 0.13;
       a.shadow.position.copyFrom(a.root.position);
       a.shadow.position.y = 0.052;
       a.mesh.renderOverlay = this.time > a.hitAt && this.time < a.hitAt + 0.14;
@@ -999,17 +1064,10 @@ export class WorldView {
           bar,
           a.root.position.add(new Vector3(0, e.type === 1 ? 1.25 : 1.4, 0)),
         );
+        bar.hidden ||= e.hp === enemyData[e.type].hp && e !== engaged;
         bar.classList.toggle(
           "engaged",
-          Math.hypot(e.x - m.player.x, e.y - m.player.y) < 100 &&
-            !m.enemies.some(
-              (other) =>
-                !other.dead &&
-                other.zone <= m.s.zone &&
-                other !== e &&
-                Math.hypot(other.x - m.player.x, other.y - m.player.y) <
-                  Math.hypot(e.x - m.player.x, e.y - m.player.y),
-            ),
+          e === engaged && Math.hypot(e.x - m.player.x, e.y - m.player.y) < 108,
         );
         (bar.firstElementChild as HTMLElement).style.width =
           `${(e.hp / enemyData[e.type].hp) * 100}%`;
@@ -1095,6 +1153,7 @@ export class WorldView {
       const near = Math.hypot(d.x - m.player.x, d.y - m.player.y);
       mesh.scaling.setAll(
         (d.kind === "wood" ? 0.85 : 1.2) *
+          (1 + Math.min(0.55, Math.log2(Math.max(1, d.amount)) * 0.09)) *
           (d.age > 0.3 ? Math.min(1, 0.45 + near / 60) : 1),
       );
     }
@@ -1102,8 +1161,7 @@ export class WorldView {
       const f = this.particles[i],
         age = this.time - f.born;
       if (age > f.life) {
-        if (f.mesh.metadata?.ripple) f.mesh.material?.dispose();
-        f.mesh.dispose();
+        this.recycleEffect(f.mesh);
         this.particles.splice(i, 1);
         continue;
       }
@@ -1311,7 +1369,14 @@ export class WorldView {
       drops: this.dropMeshes.size,
       quality: this.quality,
       triangles: this.scene.getActiveIndices() / 3,
+      cameraSpan: [
+        (this.camera.orthoRight || 0) * 2,
+        (this.camera.orthoTop || 0) * 2,
+      ],
       cargo: {
+        woodUnits: this.model.s.resources.wood,
+        bulk: stackBulk(this.model.s.resources.wood),
+        height: stackHeight(this.model.s.resources.wood),
         wood: this.rig.wood.filter((m) => m.isEnabled()).length,
         stone: this.rig.stone.filter((m) => m.isEnabled()).length,
       },

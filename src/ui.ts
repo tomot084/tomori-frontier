@@ -1,3 +1,4 @@
+import { upgradeLimit } from "./data";
 import {
   buildingData,
   resourceData,
@@ -400,7 +401,7 @@ export class GameUI {
     el("shop-toggle").classList.toggle(
       "upgrade-ready",
       (Object.keys(upgradeData) as Upgrade[]).some(
-        (u) => s.levels[u] < 5 && s.resources.coin >= cost(s, u),
+        (u) => s.levels[u] < upgradeLimit(u) && s.resources.coin >= cost(s, u),
       ),
     );
     el("shop-toggle").hidden = !show || this.shopOpen;
@@ -421,7 +422,7 @@ export class GameUI {
       el("upgrades").innerHTML = (Object.keys(upgradeData) as Upgrade[])
         .map(
           (u) =>
-            `<button data-u="${u}" ${s.resources.coin < cost(s, u) || s.levels[u] >= 5 ? "disabled" : ""}><i>${symbols[u]}</i><span><b>${upgradeData[u].name}<em>Lv.${s.levels[u]}</em></b><small>${upgradeData[u].description}</small></span><strong>${s.levels[u] >= 5 ? "MAX" : `✦ ${cost(s, u)}`}</strong></button>`,
+            `<button data-u="${u}" ${s.resources.coin < cost(s, u) || s.levels[u] >= upgradeLimit(u) ? "disabled" : ""}><i>${symbols[u]}</i><span><b>${upgradeData[u].name}<em>Lv.${s.levels[u]}</em></b><small>${upgradeData[u].description}</small></span><strong>${s.levels[u] >= upgradeLimit(u) ? "MAX" : `✦ ${cost(s, u)}`}</strong></button>`,
         )
         .join("");
     }

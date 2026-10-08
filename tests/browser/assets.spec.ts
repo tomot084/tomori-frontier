@@ -42,7 +42,7 @@ test("self-hosted character is ready before play and animates during real moveme
     )
     .toBeGreaterThan(0);
   expect((await inspect()).cargo.wood).toBeGreaterThan(0);
-  expect((await inspect()).meshes).toBeLessThan(1100);
+  expect((await inspect()).meshes).toBeLessThan(1400);
   expect(errors).toEqual([]);
   await page.screenshot({ path: "screenshots/assets-tested-gather-390.png" });
 });
