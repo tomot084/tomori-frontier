@@ -1,5 +1,5 @@
-import { inputPoint, inputCapacity } from "./investments";
-import { buildingData, gatherableData } from "./data";
+import { inputCapacity } from "./investments";
+import { gatherableData } from "./data";
 import type { GameModel, Point } from "./simulation";
 export interface LanternWorker extends Point {
   id: number;
@@ -33,6 +33,7 @@ export class LanternCrew {
   }));
   constructor(private game: GameModel) {}
   step(dt: number) {
+    const { inputPoint } = this.game.stage.layout;
     const g = this.game,
       currentZone = g.s.zone;
     for (const w of this.workers) {
@@ -48,15 +49,23 @@ export class LanternCrew {
       if (w.zone !== zone) {
         Object.assign(w, {
           zone,
-          x: (zone === 0 ? 570 : 690) + w.id * 36,
-          y: (zone === 0 ? 205 : 940 + (zone - 1) * 550) + w.id * 28,
+          x:
+            (zone === 0
+              ? g.investments.tiles.find((t) => t.id === "carrier")!.x
+              : g.stage.camps[zone].x) +
+            w.id * 36,
+          y:
+            (zone === 0
+              ? g.investments.tiles.find((t) => t.id === "carrier")!.y - 35
+              : g.stage.camps[zone].y) +
+            w.id * 28,
           phase: "search",
           cargo: 0,
           clock: w.id * 0.35,
           targetId: "",
         });
       }
-      const b = buildingData[zone],
+      const b = g.stage.buildings[zone],
         progress = g.s.progress[zone];
       const walk = (p: Point) => {
         const dx = p.x - w.x,

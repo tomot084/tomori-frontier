@@ -1,3 +1,5 @@
+import { getStage, stages, type StageArchive } from "./stages";
+import { contentIds, workshopKeys, type ContentId } from "./content";
 export type Resource = "wood" | "stone" | "food" | "coin";
 export type Upgrade = "attack" | "gather" | "speed" | "health" | "capacity";
 export const resourceData = {
@@ -42,6 +44,36 @@ export const enemyData = [
     color: 0xe6a57b,
     drop: 6,
   },
+  {
+    id: "frostwolf",
+    name: "霜牙",
+    hp: 12,
+    attack: 4,
+    speed: 65,
+    range: 30,
+    color: 0x91bfd3,
+    drop: 12,
+  },
+  {
+    id: "crystalback",
+    name: "晶甲",
+    hp: 18,
+    attack: 5,
+    speed: 32,
+    range: 34,
+    color: 0xa7a1d2,
+    drop: 18,
+  },
+  {
+    id: "guardian",
+    name: "霧の守護獣",
+    hp: 90,
+    attack: 9,
+    speed: 38,
+    range: 50,
+    color: 0xd3ad70,
+    drop: 120,
+  },
 ];
 export const upgradeData: Record<
   Upgrade,
@@ -61,21 +93,7 @@ export const upgradeData: Record<
     description: "容量 500 → 2000 → 5000 → 10000",
   },
 };
-export const buildingData: Building[] = [
-  { name: "芽渡り橋", y: 730, cost: { wood: 20, stone: 10, food: 0 }, zone: 1 },
-  {
-    name: "霧払い門",
-    y: 1280,
-    cost: { wood: 55, stone: 45, food: 8 },
-    zone: 2,
-  },
-  {
-    name: "暁の灯台",
-    y: 1830,
-    cost: { wood: 90, stone: 80, food: 16 },
-    zone: 3,
-  },
-];
+export const buildingData = getStage().buildings;
 export type Perk =
   "sawmill" | "quarry" | "depot" | "cart" | "magnet" | "bounty";
 export const perkIds: Perk[] = [
@@ -122,6 +140,11 @@ export const machineIds = [
 ] as const;
 export type Machine = (typeof machineIds)[number];
 export interface Economy {
+  content?: Partial<Record<ContentId, number>>;
+  workshops?: Partial<Record<string, number>>;
+  discoveries?: string[];
+  boardRoute?: "build" | "market";
+  bossDefeated?: boolean;
   machines?: Partial<Record<Machine, number>>;
   drillStock?: number;
   towerStock?: Partial<Record<Resource, number>>;
@@ -135,6 +158,8 @@ export interface Economy {
   sold: number;
 }
 export interface Save {
+  stage?: string;
+  worlds?: Partial<Record<string, StageArchive>>;
   economy?: Economy;
   version: 1;
   resources: Record<Resource, number>;
@@ -192,7 +217,7 @@ export const upgradeLimit = (u: Upgrade) => (u === "capacity" ? 3 : 5);
 export const cost = (s: Save, u: Upgrade) =>
   Math.ceil(upgradeData[u].base * 1.55 ** s.levels[u]);
 export function deposit(s: Save, index: number, r: "wood" | "stone" | "food") {
-  const need = buildingData[index].cost[r];
+  const need = getStage(s.stage).buildings[index].cost[r];
   if (s.resources[r] > 0 && s.progress[index][r] < need) {
     s.resources[r]--;
     s.progress[index][r]++;
@@ -201,7 +226,7 @@ export function deposit(s: Save, index: number, r: "wood" | "stone" | "food") {
   return false;
 }
 export function complete(s: Save, index: number) {
-  return Object.entries(buildingData[index].cost).every(
+  return Object.entries(getStage(s.stage).buildings[index].cost).every(
     ([r, n]) => s.progress[index][r] >= n,
   );
 }
@@ -248,8 +273,50 @@ export function load(raw: string | null): Save {
     return {
       ...f,
       ...v,
+      ...(v.stage !== undefined ? { stage: getStage(v.stage).id } : {}),
       economy: v.economy
         ? {
+            ...(v.economy.content
+              ? {
+                  content: Object.fromEntries(
+                    contentIds
+                      .filter((id) => id in v.economy.content)
+                      .map((id) => [id, v.economy.content[id] === 1 ? 1 : 0]),
+                  ),
+                }
+              : {}),
+            ...(v.economy.workshops
+              ? {
+                  workshops: Object.fromEntries(
+                    workshopKeys.map((id) => [
+                      id,
+                      Number.isSafeInteger(v.economy.workshops[id])
+                        ? Math.max(0, Math.min(2000, v.economy.workshops[id]))
+                        : 0,
+                    ]),
+                  ),
+                }
+              : {}),
+            ...(Array.isArray(v.economy.discoveries)
+              ? {
+                  discoveries: [
+                    ...new Set(
+                      v.economy.discoveries.filter(
+                        (id: unknown) =>
+                          typeof id === "string" &&
+                          getStage(v.stage).treasures.some((t) => t.id === id),
+                      ),
+                    ),
+                  ] as string[],
+                }
+              : {}),
+            ...(v.economy.boardRoute
+              ? {
+                  boardRoute:
+                    v.economy.boardRoute === "market" ? "market" : "build",
+                }
+              : {}),
+            ...(v.economy.bossDefeated === true ? { bossDefeated: true } : {}),
             ...(v.economy.machines
               ? {
                   machines: Object.fromEntries(
@@ -358,10 +425,48 @@ export function load(raw: string | null): Save {
             stock: 0,
             sold: 0,
           },
+      ...(v.worlds && typeof v.worlds === "object"
+        ? {
+            worlds: Object.fromEntries(
+              Object.keys(stages)
+                .filter((id) => v.worlds[id])
+                .map((id) => {
+                  const w = v.worlds[id];
+                  const parsed = load(
+                    JSON.stringify({
+                      ...f,
+                      ...w,
+                      resources: v.resources,
+                      levels: v.levels,
+                      hp: v.hp,
+                      kills: v.kills,
+                      time: v.time,
+                      stage: id,
+                      worlds: undefined,
+                    }),
+                  );
+                  return [
+                    id,
+                    {
+                      zone: parsed.zone,
+                      progress: parsed.progress,
+                      economy: parsed.economy!,
+                      x: parsed.x,
+                      y: parsed.y,
+                      won: parsed.won,
+                    },
+                  ];
+                }),
+            ),
+          }
+        : {}),
       x: Math.max(70, Math.min(830, v.x)),
       y: Math.max(
         180,
-        Math.min(v.zone < 3 ? buildingData[v.zone].y - 45 : 1950, v.y),
+        Math.min(
+          v.zone < 3 ? getStage(v.stage).buildings[v.zone].y - 45 : 1950,
+          v.y,
+        ),
       ),
       hp: Math.max(1, Math.min(stats(v).hp, v.hp)),
     };

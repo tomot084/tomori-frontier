@@ -1,8 +1,9 @@
+import { SettlementView } from "./settlement-view";
 import { MachineView } from "./machine-view";
 import { visualStack, stackHeight, stackBulk } from "./cargo";
 import { ProductionView } from "./production-view";
 import { InvestmentView } from "./investment-view";
-import { customerPoint } from "./investments";
+
 import { Keeper } from "./keeper";
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
@@ -21,9 +22,9 @@ import type { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Art, color, palette, worldPoint } from "./models";
-import { makeScenery, type BuiltSite } from "./scenery";
+import { makeScenery } from "./scenery";
 import { GameModel, type GameEvent, type Point } from "./simulation";
-import { buildingData, enemyData, resourceData } from "./data";
+import { enemyData, resourceData } from "./data";
 interface Actor {
   root: TransformNode;
   mesh: AbstractMesh;
@@ -47,6 +48,8 @@ interface Fragment {
 export class WorldView {
   production!: ProductionView;
   machines!: MachineView;
+  settlementView!: SettlementView;
+  enemySources: Mesh[] = [];
   investments!: InvestmentView;
   customerLabel!: HTMLElement;
   keeper = new Keeper();
@@ -230,6 +233,7 @@ export class WorldView {
     this.shadows.normalBias = 0.025;
     this.shadows.setDarkness(0.32);
     this.art = new Art(this.scene);
+    this.art.biome = model.stage.id;
     this.guideRing = MeshBuilder.CreateTorus(
       "next-action",
       { diameter: 2.1, thickness: 0.075, tessellation: 32 },
@@ -245,16 +249,37 @@ export class WorldView {
     this.guideLabel.className = "guide-label";
     overlay.append(this.guideLabel);
     this.shadowMaterial = this.makeShadowMaterial();
-    this.scenery = makeScenery(this.art);
+    this.scenery = makeScenery(this.art, model.stage);
     this.production = new ProductionView(this.art, model, overlay);
+    this.settlementView = new SettlementView(this.art, model, overlay);
     this.machines = new MachineView(this.art, model, overlay);
     // Shared soft contact shadows ground the racks and machinery without a screen-space pass.
     for (const [x, y, w, d] of [
-      [380, 430, 4.5, 2.2],
-      [465, 430, 2.5, 2],
-      [295, 430, 2.5, 1.8],
-      [610, 500, 3.5, 2.4],
-      [650, 560, 1.7, 1.5],
+      [model.stage.layout.sawPoint.x, model.stage.layout.sawPoint.y, 4.5, 2.2],
+      [
+        model.stage.layout.inputPoint.x,
+        model.stage.layout.inputPoint.y,
+        2.5,
+        2,
+      ],
+      [
+        model.stage.layout.outputPoint.x,
+        model.stage.layout.outputPoint.y,
+        2.5,
+        1.8,
+      ],
+      [
+        model.stage.layout.marketPoint.x,
+        model.stage.layout.marketPoint.y,
+        3.5,
+        2.4,
+      ],
+      [
+        model.stage.layout.tillPoint.x,
+        model.stage.layout.tillPoint.y,
+        1.7,
+        1.5,
+      ],
     ]) {
       const contact = this.shadow(w);
       contact.scaling.z = d / (w * 0.78);
@@ -311,15 +336,16 @@ export class WorldView {
         stump.freezeWorldMatrix();
       }
     }
-    const enemySources = enemyData.map((_, type) => {
+    const enemySources = (this.enemySources = enemyData.map((_, type) => {
       const mesh = this.art.enemy(type);
       mesh.setEnabled(false);
       return mesh;
-    });
+    }));
     for (const e of model.enemies) {
       const root = new TransformNode(e.id, this.scene);
       const mesh = enemySources[e.type].createInstance(e.id + "-body");
       mesh.parent = root;
+      mesh.metadata = { enemyType: e.type };
       const shadow = this.shadow(e.type === 1 ? 1.25 : 0.95);
       this.actors.set(e.id, {
         root,
@@ -385,7 +411,7 @@ export class WorldView {
     this.trail.material = trailMat;
     this.trail.isPickable = false;
     this.trail.setEnabled(false);
-    buildingData.forEach((b, i) => {
+    this.model.stage.buildings.forEach((_b, i) => {
       const label = document.createElement("div");
       label.className = "site-label";
       label.dataset.site = String(i);
@@ -728,7 +754,7 @@ export class WorldView {
       this.art.resource(e.kind || "wood", "delivered-resource"),
     );
     const origin = worldPoint(e.x, e.y, 1.2),
-      dest = worldPoint(450, buildingData[e.index!].y, 0.4);
+      dest = worldPoint(450, this.model.stage.buildings[e.index!].y, 0.4);
     const velocity = dest.subtract(origin).scale(1 / 0.38);
     this.particles.push({
       mesh,
@@ -773,7 +799,7 @@ export class WorldView {
   }
   syncSites() {
     this.scenery.sites.forEach((site, i) => {
-      const b = buildingData[i],
+      const b = this.model.stage.buildings[i],
         p = this.model.s.progress[i],
         total = Object.values(b.cost).reduce((a, n) => a + n, 0),
         done = Object.values(p).reduce((a, n) => a + n, 0),
@@ -792,15 +818,19 @@ export class WorldView {
         ? i === 2
           ? "<b>暁の灯台</b><span>復旧完了</span>"
           : ""
-        : `<b>${i === 0 ? "芽渡り橋" : b.name}</b><span>木 ${Math.max(0, b.cost.wood - p.wood)} · 石 ${Math.max(0, b.cost.stone - p.stone)}${b.cost.food ? ` · 実 ${Math.max(0, b.cost.food - p.food)}` : ""}</span><i style="--progress:${progress * 100}%"></i>`;
+        : `<b>${b.name}</b><span>木 ${Math.max(0, b.cost.wood - p.wood)} · 石 ${Math.max(0, b.cost.stone - p.stone)}${b.cost.food ? ` · 実 ${Math.max(0, b.cost.food - p.food)}` : ""}</span><i style="--progress:${progress * 100}%"></i>`;
       site.progress = progress;
     });
   }
   update(delta: number) {
+    const { customerPoint } = this.model.stage.layout;
     const dt = Math.min(delta, 240) / 1000;
     this.time += dt;
     const m = this.model;
     this.syncCargo();
+    this.settlementView.update((el, at, visible) =>
+      this.place(el, at, visible),
+    );
     this.machines.update((el, at, visible) => this.place(el, at, visible));
     this.production.update(dt, this.time, (el, at, visible) =>
       this.place(el, at, visible),
@@ -817,15 +847,19 @@ export class WorldView {
         this.pickupBatches.delete(kind);
       }
     // A gentle hub bias keeps both ends of the saw line on screen while preserving player scale.
+    const hub = {
+      x: m.stage.layout.sawPoint.x + 10,
+      y: m.stage.layout.sawPoint.y + 10,
+    };
     const hubWeight =
       this.width < this.height
         ? Math.max(
             0,
-            1 - Math.hypot(m.player.x - 390, m.player.y - 440) / 180,
+            1 - Math.hypot(m.player.x - hub.x, m.player.y - hub.y) / 180,
           ) * 0.3
         : 0;
     const desired = worldPoint(
-      m.player.x + (390 - m.player.x) * hubWeight,
+      m.player.x + (hub.x - m.player.x) * hubWeight,
       m.player.y - (this.width < this.height ? 20 : 10),
     );
     const guide = m.guidance;
@@ -836,11 +870,11 @@ export class WorldView {
     this.guideRing.scaling.setAll(1 + Math.sin(this.time * 4) * 0.055);
     this.guideLabel.textContent =
       guide.kind === "build"
-        ? guide.target.x === 465
+        ? guide.target.x === m.stage.layout.inputPoint.x
           ? "INPUT 投入"
-          : guide.target.x === 295
+          : guide.target.x === m.stage.layout.outputPoint.x
             ? "OUTPUT 拾う"
-            : guide.target.x === 650
+            : guide.target.x === m.stage.layout.tillPoint.x
               ? "灯貨を回収"
               : "ここへ届ける"
         : guide.kind === "done"
@@ -992,8 +1026,20 @@ export class WorldView {
       const hidesHelper = m.crew.workers.some(
         (w) => w.active && Math.hypot(w.x - n.x, w.y - n.y) < 42,
       );
-      a.mesh.visibility =
-        hidesHelper && n.kind === "wood"
+      const hidesNewWorker = m.settlements.workers.some(
+        (w) =>
+          m.settlements.owned(w.id) && Math.hypot(w.x - n.x, w.y - n.y) < 42,
+      );
+      const hidesBuilding =
+        n.kind === "wood" &&
+        m.stage.contents.some(
+          (c) =>
+            m.investments.content(c.id) &&
+            Math.hypot(c.x - n.x, c.y - n.y) < 110,
+        );
+      a.mesh.visibility = hidesBuilding
+        ? 0.25
+        : (hidesHelper || hidesNewWorker) && n.kind === "wood"
           ? 0.3
           : n.kind === "wood" &&
               toPlayer.length() < 2.2 &&
@@ -1014,8 +1060,17 @@ export class WorldView {
       }
     }
     for (const e of m.enemies) {
-      const a = this.actors.get(e.id)!,
-        age = this.time - a.dieAt,
+      const a = this.actors.get(e.id)!;
+      if (a.mesh.metadata?.enemyType !== e.type) {
+        a.mesh.dispose();
+        const mesh = this.enemySources[e.type].createInstance(e.id + "-body");
+        mesh.parent = a.root;
+        mesh.metadata = { enemyType: e.type };
+        a.mesh = mesh;
+        this.enemyBars.get(e.id)!.innerHTML =
+          `<i></i><span>${enemyData[e.type].name}</span>`;
+      }
+      const age = this.time - a.dieAt,
         dying = !!e.dead && age < 0.26,
         visible =
           e.zone <= m.s.zone &&
@@ -1047,10 +1102,11 @@ export class WorldView {
       const hitAge = this.time - a.hitAt;
       const recoil =
         hitAge >= 0 && hitAge < 0.22 ? Math.sin((hitAge / 0.22) * Math.PI) : 0;
+      const size = e.type === 5 ? 2.3 : 1.22;
       a.root.scaling.set(
-        1.22 + recoil * 0.18,
-        1.22 - recoil * 0.16,
-        1.22 + recoil * 0.18,
+        size + recoil * 0.18,
+        size - recoil * 0.16,
+        size + recoil * 0.18,
       );
       if (dying) {
         a.root.scaling.setAll(Math.max(0.01, 1.22 * (1 - age / 0.26)));
@@ -1087,7 +1143,16 @@ export class WorldView {
             mesh.name.startsWith("border-tree-")) &&
           Vector3.DistanceSquared(mesh.position, p.root.position) <
             (mesh.name.startsWith("border-tree-") ? 5 : 1.9);
-        mesh.visibility = i <= m.s.zone ? (underCanopy ? 0.3 : 1) : 1;
+        const overWorksite =
+          mesh.name.startsWith("border-tree-") &&
+          m.stage.contents.some(
+            (c) =>
+              m.investments.content(c.id) &&
+              Vector3.DistanceSquared(mesh.position, worldPoint(c.x, c.y)) <
+                6.25,
+          );
+        mesh.visibility =
+          i <= m.s.zone ? (underCanopy || overWorksite ? 0.3 : 1) : 1;
       }
     });
     casters.push(
@@ -1221,21 +1286,24 @@ export class WorldView {
       );
       this.place(
         label,
-        worldPoint(590, buildingData[i].y, i === 2 ? 3.1 : i === 1 ? 2.7 : 1.4),
+        worldPoint(
+          590,
+          this.model.stage.buildings[i].y,
+          i === 2 ? 3.1 : i === 1 ? 2.7 : 1.4,
+        ),
         i <= m.s.zone &&
           (m.s.zone <= i || i === 2) &&
-          Math.hypot(m.player.x - 590, m.player.y - buildingData[i].y) < 145 &&
+          Math.hypot(
+            m.player.x - 590,
+            m.player.y - this.model.stage.buildings[i].y,
+          ) < 145 &&
           !(
             i === 0 &&
             ["market", "waiter"].includes(m.investments.nearest?.id ?? "")
           ),
       );
     });
-    const campPts = [
-      [450, 290],
-      [690, 940],
-      [690, 1490],
-    ];
+    const campPts = this.model.stage.camps.map((c) => [c.x, c.y]);
     this.campLabels.forEach((label, i) =>
       this.place(
         label,
@@ -1309,7 +1377,10 @@ export class WorldView {
         cargo = h.cargo;
         moving = h.phase === "take" ? 0 : 1;
       } else if (role === "sawyer") {
-        at = { x: 380 + Math.sin(this.time * 1.4) * 12, y: 380 };
+        at = {
+          x: m.stage.layout.sawPoint.x + Math.sin(this.time * 1.4) * 12,
+          y: m.stage.layout.sawPoint.y - 50,
+        };
         active = production.sawyer;
         heading = Math.PI;
         phase = production.processing ? (this.time * 2) % 1 : -1;
@@ -1357,6 +1428,7 @@ export class WorldView {
     return {
       production: this.production.metrics(),
       machines: this.model.machines.metrics(),
+      settlements: this.model.settlements.metrics(),
       renderer: "Babylon.js WebGL",
       keeper: this.keeper.metrics(),
       crew: this.model.crew.workers,

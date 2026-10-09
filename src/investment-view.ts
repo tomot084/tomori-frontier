@@ -1,11 +1,7 @@
+import { isContent } from "./content";
 import type { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { Art, palette, worldPoint } from "./models";
-import {
-  investmentTiles,
-  customerPoint,
-  marketPoint,
-  machineOffers,
-} from "./investments";
+import { machineOffers } from "./investments";
 import type { GameModel } from "./simulation";
 export class InvestmentView {
   waiter: ReturnType<Art["helper"]>;
@@ -13,12 +9,13 @@ export class InvestmentView {
   bases: ReturnType<Art["merge"]>[] = [];
   stock: ReturnType<Art["merge"]>;
   constructor(
-    private art: Art,
+    art: Art,
     private game: GameModel,
     shadows: ShadowGenerator,
   ) {
-    for (const tile of investmentTiles) {
-      if (tile.id in machineOffers) continue;
+    const { customerPoint, marketPoint } = game.stage.layout;
+    for (const tile of game.investments.tiles) {
+      if (tile.id in machineOffers || isContent(tile.id)) continue;
       const parts: import("@babylonjs/core/Meshes/mesh").Mesh[] = [];
       // Each investment has an original miniature prop, readable without a floating panel.
       if (["conveyor", "hauler", "sawyer"].includes(tile.id)) {
@@ -534,7 +531,7 @@ export class InvestmentView {
   }
   update(time: number) {
     for (const base of this.bases) {
-      const tile = investmentTiles.find(
+      const tile = this.game.investments.tiles.find(
         (t) => base.name === `investment-${t.id}`,
       );
       if (!tile) continue;

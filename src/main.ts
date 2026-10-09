@@ -42,13 +42,31 @@ function boot() {
     uiAt = 0;
   const feedback = new GameFeedback();
   const movement = new MovementInput(canvas, el("stick"));
-  const ui = new GameUI(model, (u: Upgrade) => {
-    if (model.purchase(u)) {
-      persist();
-      ui.update(started);
-      view.syncSites();
-    }
-  });
+  const ui = new GameUI(
+    model,
+    (u: Upgrade) => {
+      if (model.purchase(u)) {
+        persist();
+        ui.update(started);
+        view.syncSites();
+      }
+    },
+    () => {
+      const next = model.travel();
+      if (!next) {
+        ui.toast("航路のそばで出発できます");
+        return;
+      }
+      try {
+        resetting = true;
+        localStorage.setItem(KEY, JSON.stringify(next));
+        location.reload();
+      } catch {
+        resetting = false;
+        ui.toast("保存できないため出発できませんでした");
+      }
+    },
+  );
   let resetting = false;
   function persist() {
     if (resetting) return;
@@ -168,7 +186,9 @@ function boot() {
       entities: () => ({
         nodes: model.nodes,
         enemies: model.enemies,
-        buildings: importedBuildings,
+        buildings: model.stage.buildings,
+        treasures: model.stage.treasures,
+        contents: model.stage.contents,
       }),
       save: persist,
       input: (x: number, y: number) => {
@@ -254,4 +274,3 @@ function boot() {
     }
   });
 }
-import { buildingData as importedBuildings } from "./data";

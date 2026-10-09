@@ -4,13 +4,7 @@ import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import type { InstancedMesh } from "@babylonjs/core/Meshes/instancedMesh";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { Art, palette, worldPoint } from "./models";
-import {
-  inputPoint,
-  outputPoint,
-  sawPoint,
-  tillPoint,
-  marketPoint,
-} from "./investments";
+
 import type { GameModel, GameEvent, Point } from "./simulation";
 /** Fixed instance pools. Inventory and animated transfers never allocate geometry per item. */
 export class ProductionView {
@@ -35,10 +29,12 @@ export class ProductionView {
   finishedPiece: InstancedMesh;
   labels: HTMLElement[] = [];
   constructor(
-    private art: Art,
+    art: Art,
     private game: GameModel,
     overlay: HTMLElement,
   ) {
+    const { inputPoint, outputPoint, sawPoint, tillPoint, marketPoint } =
+      game.stage.layout;
     this.sources = {
       wood: art.log("production-log-source"),
       plank: art.box(
@@ -50,6 +46,16 @@ export class ProductionView {
         0.16,
         0.36,
         palette.cut,
+      ),
+      brick: art.box(
+        "production-brick-source",
+        0,
+        0,
+        0,
+        0.55,
+        0.26,
+        0.35,
+        0xcc9978,
       ),
       stone: art.resource("stone", "production-stone-source"),
       food: art.resource("food", "production-food-source"),
@@ -193,20 +199,6 @@ export class ProductionView {
       overlay.append(label);
       this.labels.push(label);
     }
-    for (const kind of ["wood", "plank", "coin", "stone", "food"])
-      for (let i = 0; i < 24; i++) {
-        const mesh = this.sources[kind].createInstance(`flow-${kind}-${i}`);
-        mesh.setEnabled(false);
-        mesh.isPickable = false;
-        this.flights.push({
-          mesh,
-          kind,
-          age: 99,
-          from: Vector3.Zero(),
-          to: Vector3.Zero(),
-          life: 0.4,
-        });
-      }
     this.workpiece = this.sources.wood.createInstance("belt-timber");
     this.workpiece.setEnabled(false);
     this.finishedPiece = this.sources.plank.createInstance(
@@ -362,6 +354,7 @@ export class ProductionView {
     }
   }
   event(e: GameEvent) {
+    const { inputPoint, sawPoint } = this.game.stage.layout;
     if (e.type !== "flow") return;
     if (
       this.game.investments.production.conveyor &&
@@ -370,7 +363,28 @@ export class ProductionView {
       e.toX === sawPoint.x
     )
       return;
-    const f = this.flights.find((f) => f.kind === e.kind && f.age >= f.life);
+    let f = this.flights.find((f) => f.kind === e.kind && f.age >= f.life);
+    if (
+      !f &&
+      e.kind &&
+      this.sources[e.kind] &&
+      this.flights.filter((f) => f.kind === e.kind).length < 24
+    ) {
+      const mesh = this.sources[e.kind].createInstance(
+        `flow-${e.kind}-${this.flights.length}`,
+      );
+      mesh.setEnabled(false);
+      mesh.isPickable = false;
+      f = {
+        mesh,
+        kind: e.kind,
+        age: 99,
+        from: Vector3.Zero(),
+        to: Vector3.Zero(),
+        life: 0.4,
+      };
+      this.flights.push(f);
+    }
     if (!f) return;
     f.age = 0;
     f.from.copyFrom(worldPoint(e.x, e.y, e.height ?? 1));
@@ -407,11 +421,12 @@ export class ProductionView {
     time: number,
     place: (element: HTMLElement, at: Vector3, visible: boolean) => unknown,
   ) {
+    const { inputPoint, outputPoint, sawPoint } = this.game.stage.layout;
     const p = this.game.investments.production,
       e = this.game.investments.economy;
     const counts = [
       p.input,
-      Math.max(0, p.output - this.game.investments.hauler.cargo),
+      Math.max(0, p.output - this.game.investments.reservedOutput),
       Math.max(0, e.stock - this.game.investments.waiter.cargo),
       p.uncollected,
     ];

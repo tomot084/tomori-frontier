@@ -28,7 +28,7 @@ test("small deliveries fund an early tool upgrade and the workshop pauses play",
           page.evaluate(() => (window as any).__game.state().resources.wood),
         { timeout: 15000 },
       )
-      .toBeGreaterThanOrEqual(5);
+      .toBeGreaterThanOrEqual(20);
     await page.evaluate(() => (window as any).__game.position(450, 682));
     await expect
       .poll(

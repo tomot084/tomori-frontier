@@ -1,5 +1,5 @@
 import { gatherableData, resourceData, stats, type Resource } from "./data";
-import { drillPoint, turretPoint, towerPoint } from "./investments";
+
 import type { GameModel, Enemy } from "./simulation";
 export interface Shot {
   active: boolean;
@@ -35,6 +35,7 @@ export class WorldMachines {
     return this.game.investments.machine("turretReach") ? 250 : 180;
   }
   fire(target: Enemy, side: number) {
+    const { turretPoint } = this.game.stage.layout;
     const shot = this.shots.find((s) => !s.active);
     if (!shot) return;
     const angle = Math.atan2(
@@ -60,6 +61,7 @@ export class WorldMachines {
     this.game.burst({ x: shot.x, y: shot.y }, 0xffdd83, 2);
   }
   step(dt: number) {
+    const { turretPoint, drillPoint, towerPoint } = this.game.stage.layout;
     const g = this.game,
       i = g.investments,
       e = i.economy;
@@ -84,7 +86,8 @@ export class WorldMachines {
         );
         if (
           t < best &&
-          Math.hypot(enemy.x - s.x - sx * t, enemy.y - s.y - sy * t) < 15
+          Math.hypot(enemy.x - s.x - sx * t, enemy.y - s.y - sy * t) <
+            (enemy.type === 5 ? 40 : 15)
         ) {
           struck = enemy;
           best = t;
@@ -100,14 +103,14 @@ export class WorldMachines {
       }
       if (struck || s.life <= 0) s.active = false;
     }
-    if (i.machine("turret") && g.s.zone >= 1) {
+    if (i.machine("turret") && g.s.zone >= i.offer("turret").unlock) {
       this.fireClock += dt;
       let target: Enemy | undefined,
         second: Enemy | undefined,
         nearest = Infinity,
         next = Infinity;
       for (const enemy of g.enemies) {
-        if (enemy.dead || enemy.zone !== 1) continue;
+        if (enemy.dead || enemy.zone > g.s.zone) continue;
         const distance = Math.hypot(
           enemy.x - turretPoint.x,
           enemy.y - turretPoint.y,
@@ -145,11 +148,12 @@ export class WorldMachines {
         }
       }
     }
-    const rock = g.nodes.find((n) => n.id === "node-1-13");
+    const rock = g.nodes.find((n) => n.id === g.miningNodeId);
     this.drillWorking = !!(
       i.machine("drill") &&
       rock &&
       !rock.dead &&
+      rock.zone <= g.s.zone &&
       (e.drillStock ?? 0) +
         gatherableData.stone.yield +
         i.resourceBonus("stone") <=

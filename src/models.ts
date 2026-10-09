@@ -32,13 +32,14 @@ const noise = (n: number) => {
   return x - Math.floor(x);
 };
 export class Art {
+  biome = "frontier";
   material: StandardMaterial;
   constructor(public scene: Scene) {
     this.material = new StandardMaterial("tomori-matte-paint", scene);
     this.material.diffuseColor = new Color3(1, 1, 1);
     this.material.specularColor = Color3.Black();
   }
-  tint(mesh: Mesh, hex: number, facets = false) {
+  tint(mesh: Mesh, hex: number, _facets = false) {
     // Broad, clean color fields; no random per-triangle tint.
     const c = color(hex),
       n = mesh.getTotalVertices(),
@@ -283,6 +284,24 @@ export class Art {
     );
     tree.rotation.y = noise(seed) * Math.PI * 2;
     if (!harvestable) tree.scaling.setAll(0.9 + noise(seed + zone) * 0.12);
+    if (this.biome === "frost") {
+      const colors = tree.getVerticesData(VertexBuffer.ColorKind);
+      if (colors) {
+        for (let i = 0; i < colors.length; i += 4)
+          if (
+            colors[i + 1] > colors[i] * 1.04 &&
+            colors[i + 1] > colors[i + 2]
+          ) {
+            const tint = color(
+              zone === 0 ? 0xdce7dd : zone === 1 ? 0x99c3cd : 0xbb967b,
+            );
+            colors[i] = tint.r;
+            colors[i + 1] = tint.g;
+            colors[i + 2] = tint.b;
+          }
+        tree.setVerticesData(VertexBuffer.ColorKind, colors);
+      }
+    }
     return tree;
   }
 
@@ -557,7 +576,51 @@ export class Art {
   }
   enemy(type: number) {
     const p: Mesh[] = [];
-    if (type === 0) {
+    if (type === 3) {
+      p.push(
+        this.sphere("frost-wolf", 0, 0.55, 0, 0.95, 0.75, 1.25, 0x9bbfce, true),
+      );
+      for (const x of [-0.3, 0.3]) {
+        p.push(
+          this.cylinder("wolf-ear", x, 1.02, 0.28, 0, 0.2, 0.55, 0xdde7da),
+        );
+        p.push(this.box("wolf-leg", x, 0.18, 0.3, 0.16, 0.45, 0.2, 0x6e939f));
+      }
+      p.push(
+        this.sphere("wolf-snout", 0, 0.52, 0.58, 0.4, 0.32, 0.5, 0xe8eddf),
+      );
+    } else if (type === 4 || type === 5) {
+      p.push(
+        this.sphere(
+          "guardian-shell",
+          0,
+          0.6,
+          0,
+          1.2,
+          1.1,
+          1.2,
+          type === 5 ? 0xb99862 : 0x8f8eb4,
+          true,
+        ),
+      );
+      for (const x of [-0.35, 0, 0.35])
+        p.push(
+          this.cylinder(
+            "crystal-crown",
+            x,
+            1.15,
+            0,
+            0,
+            0.2,
+            x === 0 ? 0.95 : 0.6,
+            type === 5 ? 0xffdd83 : 0xc0d9e1,
+          ),
+        );
+      for (const x of [-0.55, 0.55])
+        p.push(
+          this.box("guardian-arm", x, 0.42, 0.15, 0.3, 0.65, 0.45, 0x64868b),
+        );
+    } else if (type === 0) {
       p.push(
         this.sphere("mist-mote", 0, 0.46, 0, 0.85, 0.83, 0.75, 0x9d96c3, true),
       );
@@ -675,7 +738,17 @@ export class Art {
         ),
       );
     }
-    return this.merge(["mist-mote", "moss-helmet", "dusk-flier"][type], p);
+    return this.merge(
+      [
+        "mist-mote",
+        "moss-helmet",
+        "dusk-flier",
+        "frost-wolf",
+        "crystalback",
+        "guardian",
+      ][type],
+      p,
+    );
   }
 
   blade() {

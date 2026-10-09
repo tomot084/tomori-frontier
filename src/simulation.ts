@@ -1,8 +1,9 @@
+import { getStage, type StageDefinition } from "./stages";
+import { Settlements } from "./settlements";
 import { WorldMachines } from "./world-machines";
 import { stackHeight } from "./cargo";
 /** Engine-independent gameplay. Coordinates and save units remain identical to v1. */
 import {
-  buildingData,
   enemyData,
   gatherableData,
   resourceData,
@@ -15,17 +16,7 @@ import {
   type Upgrade,
 } from "./data";
 import { LanternCrew } from "./crew";
-import {
-  InvestmentSystem,
-  investmentTiles,
-  customerPoint,
-  inputPoint,
-  outputPoint,
-  sawPoint,
-  tillPoint,
-  marketPoint,
-  towerPoint,
-} from "./investments";
+import { InvestmentSystem } from "./investments";
 const capFor = (kind: string, capacity: number) =>
   kind === "food" ? Math.floor(capacity / 2) : capacity;
 export interface Point {
@@ -97,6 +88,11 @@ export class GameModel {
   readonly crew = new LanternCrew(this);
   readonly investments = new InvestmentSystem(this);
   readonly machines = new WorldMachines(this);
+  readonly settlements = new Settlements(this);
+  miningNodeId = "node-1-13";
+  get stage(): StageDefinition {
+    return getStage(this.s.stage);
+  }
   player: Point;
   time = 0;
   direction = 0;
@@ -112,11 +108,19 @@ export class GameModel {
   comboAt = 0;
   dropId = 0;
   constructor(public s: Save) {
+    const investmentTiles = this.investments.tiles,
+      camps = this.stage.camps,
+      buildingData = this.stage.buildings;
+    const { customerPoint, inputPoint, outputPoint, sawPoint } =
+      this.stage.layout;
     this.player = { x: s.x, y: s.y };
+    Object.assign(this.investments.waiter, this.stage.layout.marketPoint);
+    Object.assign(this.investments.hauler, this.stage.layout.outputPoint);
     for (let z = 0; z < 3; z++)
       for (let i = 0; i < 19; i++) {
         const kind = i % 5 === 3 ? "stone" : i % 5 === 4 ? "food" : "wood";
-        const x = 140 + (i % 4) * 185 + ((i * 17) % 55),
+        const x =
+            140 + (i % 4) * 185 + ((i * 17 + this.stage.resourceSeed) % 55),
           y = 390 + z * 550 + Math.floor(i / 4) * 62;
         if (z === 0 || Math.hypot(x - 690, y - (940 + (z - 1) * 550)) > 98)
           this.nodes.push({
@@ -189,10 +193,11 @@ export class GameModel {
       }
       placed.push(n);
     }
-    const drillRock = this.nodes.find((n) => n.id === "node-1-13");
+    this.miningNodeId = this.stage.drillNodeId ?? "node-1-13";
+    const drillRock = this.nodes.find((n) => n.id === this.miningNodeId);
     if (drillRock) {
-      drillRock.x = 235;
-      drillRock.y = 1120;
+      drillRock.x = this.stage.layout.drillPoint.x + 65;
+      drillRock.y = this.stage.layout.drillPoint.y;
     }
     // Keep working machinery readable through the canopy; preserve IDs, yields and respawns.
     const facilities = investmentTiles.filter((t) =>
@@ -243,7 +248,8 @@ export class GameModel {
       for (let i = 0; i < 48; i++) {
         const pack = Math.floor(i / 8),
           slot = i % 8;
-        const type = slot % 3;
+        const types = this.stage.areas[z].enemies;
+        const type = types[slot % types.length];
         const x = 180 + (pack % 3) * 220 + Math.cos((slot * Math.PI) / 4) * 48;
         const y =
           870 +
@@ -287,7 +293,7 @@ export class GameModel {
     });
   }
   get atCamp() {
-    return camps.some(
+    return this.stage.camps.some(
       (c, i) =>
         i <= this.s.zone &&
         Math.hypot(c.x - this.player.x, c.y - this.player.y) < 85,
@@ -299,7 +305,7 @@ export class GameModel {
     remaining: number;
   } {
     if (this.investments.focus) {
-      const tile = investmentTiles.find(
+      const tile = this.investments.tiles.find(
         (t) => t.id === this.investments.focus,
       )!;
       return { kind: "build", target: tile, remaining: 0 };
@@ -307,20 +313,40 @@ export class GameModel {
     const line = this.investments.production;
     if (this.s.zone === 0 && this.investments.economy.sold < 5) {
       if (line.uncollected)
-        return { kind: "build", target: tillPoint, remaining: 0 };
+        return {
+          kind: "build",
+          target: this.stage.layout.tillPoint,
+          remaining: 0,
+        };
       if (line.carried)
-        return { kind: "build", target: marketPoint, remaining: 0 };
+        return {
+          kind: "build",
+          target: this.stage.layout.marketPoint,
+          remaining: 0,
+        };
       if (line.output)
-        return { kind: "build", target: outputPoint, remaining: 0 };
+        return {
+          kind: "build",
+          target: this.stage.layout.outputPoint,
+          remaining: 0,
+        };
       if (line.input || line.processing)
-        return { kind: "build", target: sawPoint, remaining: 0 };
+        return {
+          kind: "build",
+          target: this.stage.layout.sawPoint,
+          remaining: 0,
+        };
       if (this.s.resources.wood >= 5)
-        return { kind: "build", target: inputPoint, remaining: 0 };
+        return {
+          kind: "build",
+          target: this.stage.layout.inputPoint,
+          remaining: 0,
+        };
     }
     if (this.s.won || this.s.zone >= 3)
       return { kind: "done", target: this.player, remaining: 0 };
     const i = this.s.zone,
-      b = buildingData[i],
+      b = this.stage.buildings[i],
       progress = this.s.progress[i],
       st = stats(this.s);
     const build = {
@@ -414,6 +440,11 @@ export class GameModel {
   defeatEnemy(e: Enemy) {
     e.dead = this.time + 5500 + (Number(e.id.split("-").at(-1)) % 8) * 160;
     this.s.kills++;
+    if (e.type === 5) {
+      this.investments.economy.bossDefeated = true;
+      e.dead = Number.MAX_SAFE_INTEGER;
+      this.toast("守護獣を撃破！ +120灯貨。祠に灯りが戻った");
+    }
     this.combo = this.time - this.comboAt < 2200 ? this.combo + 1 : 1;
     this.comboAt = this.time;
     this.event("death", e, { id: e.id, kind: "enemy" });
@@ -429,7 +460,7 @@ export class GameModel {
     if (this.s.kills === 1) this.toast("灯貨を獲得！ 灯工房で道具を強化しよう");
   }
   rewardConstruction(i: number) {
-    const b = buildingData[i],
+    const b = this.stage.buildings[i],
       total = Object.values(b.cost).reduce((a, n) => a + n, 0);
     const delivered = Object.values(this.s.progress[i]).reduce(
       (a, n) => a + n,
@@ -460,7 +491,7 @@ export class GameModel {
   }
   finishConstruction(i: number) {
     if (this.s.zone !== i || !complete(this.s, i)) return;
-    const b = buildingData[i];
+    const b = this.stage.buildings[i];
     this.s.zone++;
     this.s.resources.coin += [8, 12, 20][i];
     this.event("complete", { x: 450, y: b.y }, { index: i });
@@ -474,6 +505,50 @@ export class GameModel {
     );
     if (i === 2) this.s.won = true;
     this.event("save", this.player);
+  }
+  travel(): Save | null {
+    const portal = this.stage.contents.find((c) => c.id === "portal");
+    if (!portal) return null;
+    if (
+      !this.investments.content("portal") ||
+      this.s.zone < portal.unlock ||
+      Math.hypot(this.player.x - portal.x, this.player.y - portal.y) > 100
+    )
+      return null;
+    const current = this.snapshot();
+    const worlds = {
+      ...current.worlds,
+      [this.stage.id]: {
+        zone: current.zone,
+        progress: current.progress,
+        economy: current.economy!,
+        x: current.x,
+        y: current.y,
+        won: current.won,
+      },
+    };
+    const target = getStage(this.stage.destination),
+      archive = worlds[target.id];
+    return {
+      ...current,
+      stage: target.id,
+      worlds,
+      ...(archive ?? {
+        zone: 0,
+        progress: target.buildings.map(() => ({ wood: 0, stone: 0, food: 0 })),
+        economy: {
+          carriers: 0,
+          waiter: false,
+          market: 0,
+          stock: 0,
+          sold: 0,
+          content: { portal: 1 },
+        },
+        won: false,
+      }),
+      x: archive?.x ?? target.spawn.x,
+      y: archive?.y ?? target.spawn.y,
+    };
   }
   snapshot(): Save {
     return structuredClone({ ...this.s, x: this.player.x, y: this.player.y });
@@ -497,11 +572,11 @@ export class GameModel {
       p.y = Math.max(
         190,
         Math.min(
-          this.s.zone < 3 ? buildingData[this.s.zone].y - 39 : 1965,
+          this.s.zone < 3 ? this.stage.buildings[this.s.zone].y - 39 : 1965,
           p.y + dy * st.speed * dt,
         ),
       );
-      for (const b of buildingData.slice(0, Math.min(this.s.zone, 2)))
+      for (const b of this.stage.buildings.slice(0, Math.min(this.s.zone, 2)))
         if (Math.abs(p.y - b.y) < 38 && (p.x < 395 || p.x > 505))
           p.y = dy >= 0 ? b.y - 39 : b.y + 39;
     }
@@ -511,7 +586,7 @@ export class GameModel {
         (n) =>
           !n.dead &&
           n.zone <= this.s.zone &&
-          n.y < buildingData[Math.min(this.s.zone, 2)].y &&
+          n.y < this.stage.buildings[Math.min(this.s.zone, 2)].y &&
           Math.hypot(p.x - n.x, p.y - n.y) < 65 &&
           this.s.resources[n.kind] <
             (n.kind === "food" ? Math.floor(st.capacity / 2) : st.capacity),
@@ -551,6 +626,7 @@ export class GameModel {
     const safe = this.atCamp;
     for (const e of this.enemies) {
       if (e.zone > this.s.zone) continue;
+      if (e.type === 5 && this.investments.economy.bossDefeated) continue;
       if (e.dead) {
         if (time > e.dead) {
           e.dead = 0;
@@ -569,8 +645,16 @@ export class GameModel {
         nearest = e;
       }
       if (distance < 260 && distance > d.range && !safe && chasing++ < 8) {
-        e.x += ((p.x - e.x) / distance) * d.speed * dt;
-        e.y += ((p.y - e.y) / distance) * d.speed * dt;
+        e.x +=
+          ((p.x - e.x) / distance) *
+          d.speed *
+          dt *
+          this.settlements.enemySpeed(e);
+        e.y +=
+          ((p.y - e.y) / distance) *
+          d.speed *
+          dt *
+          this.settlements.enemySpeed(e);
       }
       if (
         distance < d.range + 6 &&
@@ -585,8 +669,8 @@ export class GameModel {
         this.pop(p, `−${d.attack}`, 0xff8d7c);
         if (this.s.hp <= 0) {
           this.s.hp = st.hp;
-          p.x = 450;
-          p.y = 330;
+          p.x = this.stage.spawn.x;
+          p.y = this.stage.spawn.y - 30;
           this.toast("灯が野営地へ運んだ。素材は無事！");
         }
       }
@@ -633,8 +717,10 @@ export class GameModel {
         !(
           this.investments.machine("collector") &&
           (this.investments.economy.towerStock?.[d.kind] ?? 0) < 2000 &&
-          Math.hypot(d.x - towerPoint.x, d.y - towerPoint.y) <
-            Math.min(240, distance)
+          Math.hypot(
+            d.x - this.stage.layout.towerPoint.x,
+            d.y - this.stage.layout.towerPoint.y,
+          ) < Math.min(240, distance)
         )
       ) {
         const move = Math.min(distance, dt * (340 + d.age * 220));
@@ -653,7 +739,7 @@ export class GameModel {
     }
     if (this.s.zone < 3 && time > this.depositAt) {
       const i = this.s.zone,
-        b = buildingData[i];
+        b = this.stage.buildings[i];
       if (Math.hypot(p.x - 450, p.y - b.y) < 112) {
         this.depositAt = time + 140;
         const line = this.investments.production;
@@ -682,6 +768,7 @@ export class GameModel {
         }
       }
     }
+    this.settlements.step(dt);
     this.machines.step(dt);
     this.crew.step(dt);
     this.investments.step(dt);

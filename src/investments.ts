@@ -1,3 +1,5 @@
+import { getStage } from "./stages";
+import { contentCatalog, isContent, type ContentId } from "./content";
 import { stackHeight } from "./cargo";
 import {
   cost,
@@ -18,7 +20,8 @@ export type Investment =
   | "hauler"
   | "sawyer"
   | Perk
-  | Machine;
+  | Machine
+  | ContentId;
 export const investmentTiles: {
   id: Investment;
   name: string;
@@ -193,10 +196,18 @@ export class InvestmentSystem {
   get production() {
     return (this.economy.production ??= freshProduction());
   }
+  get reservedOutput() {
+    return (
+      this.hauler.cargo +
+      (this.game.settlements?.workers.find((w) => w.id === "splitter")?.cargo ??
+        0)
+    );
+  }
   get outputCapacity() {
     return 60 + this.level("depot") * 40;
   }
   constructor(private game: GameModel) {}
+
   get economy(): Economy {
     return (this.game.s.economy ??= {
       carriers: Math.min(2, this.game.s.zone),
@@ -206,8 +217,37 @@ export class InvestmentSystem {
       sold: 0,
     });
   }
+  private tileCache?: typeof investmentTiles;
+  get tiles(): typeof investmentTiles {
+    if (this.tileCache) return this.tileCache;
+    const stage = this.game.stage;
+    const machinePoints: Record<string, keyof typeof stage.layout> = {
+      sawmill: "sawPoint",
+      market: "marketPoint",
+      turret: "turretPoint",
+      turretReach: "turretPoint",
+      turretTwin: "turretPoint",
+      drill: "drillPoint",
+      collector: "towerPoint",
+    };
+    return (this.tileCache = [
+      ...investmentTiles.map((t) => ({
+        ...t,
+        ...(stage.investments[t.id] ??
+          (machinePoints[t.id] ? stage.layout[machinePoints[t.id]] : {})),
+      })),
+      ...stage.contents.map((t) => ({
+        ...t,
+        name: contentCatalog[t.id].name,
+        color: contentCatalog[t.id].color,
+      })),
+    ]);
+  }
+  content(id: ContentId) {
+    return this.economy.content?.[id] === 1;
+  }
   get nearest() {
-    return investmentTiles
+    return this.tiles
       .filter(
         (t) =>
           this.game.s.zone >= this.offer(t.id).unlock &&
@@ -235,6 +275,7 @@ export class InvestmentSystem {
     return this.economy.machines?.[id] ?? 0;
   }
   requires(id: Investment) {
+    if (id === "splitter") return this.production.conveyor;
     const requirement = machineOffers[id as Machine]?.requires;
     return (
       !requirement ||
@@ -273,9 +314,53 @@ export class InvestmentSystem {
   } {
     const s = this.game.s,
       e = this.economy;
+    if (isContent(id)) {
+      const def = contentCatalog[id],
+        place = this.game.stage.contents.find((c) => c.id === id);
+      if (!place)
+        return {
+          price: 0,
+          level: 0,
+          max: 0,
+          unlock: Infinity,
+          effect: def.effect,
+          benefit: def.benefit,
+        };
+      return {
+        price:
+          place.price ??
+          (id === "portal" && this.game.stage.id !== "frontier"
+            ? 0
+            : def.price),
+        level: +this.content(id),
+        max: 1,
+        unlock: Math.max(
+          place.unlock,
+          this.game.stage.areas.findIndex(
+            (a) => place.y >= a.start && place.y <= a.end,
+          ),
+        ),
+        effect:
+          id === "portal" && this.game.stage.id !== "frontier"
+            ? "灯芽の群島へ戻る。両方の進行と設備を保存"
+            : id === "portal"
+              ? `航路を復旧して${getStage(this.game.stage.destination).name}へ渡る`
+              : def.effect,
+        benefit: def.benefit,
+      };
+    }
     if (id in machineOffers) {
       return {
         ...machineOffers[id as Machine],
+        ...this.game.stage.machineRules?.[id as Machine],
+        unlock: Math.max(
+          this.game.stage.machineRules?.[id as Machine]?.unlock ??
+            machineOffers[id as Machine].unlock,
+          this.game.stage.areas.findIndex((a) => {
+            const tile = this.tiles.find((t) => t.id === id)!;
+            return tile.y >= a.start && tile.y <= a.end;
+          }),
+        ),
         level: this.machine(id as Machine),
         max: 1,
       };
@@ -381,6 +466,10 @@ export class InvestmentSystem {
       e.machines ??= {};
       e.machines[id as Machine] = 1;
     }
+    if (isContent(id)) {
+      e.content ??= {};
+      e.content[id] = 1;
+    }
     if (id === "carrier") e.carriers++;
     if (id === "waiter") e.waiter = true;
     if (id === "market") e.market++;
@@ -388,7 +477,7 @@ export class InvestmentSystem {
       e.perks ??= {};
       e.perks[id as Perk] = this.level(id as Perk) + 1;
     }
-    const tile = investmentTiles.find((t) => t.id === id)!;
+    const tile = this.tiles.find((t) => t.id === id)!;
     g.event("upgrade", tile, { kind: id });
     g.burst(tile, 0xffdb85, 12);
     g.pop(
@@ -404,6 +493,7 @@ export class InvestmentSystem {
   }
   /** Market button starts a visible sequence; passing with raw logs never sells them. */
   supply() {
+    const { marketPoint } = this.game.stage.layout;
     if (
       Math.hypot(
         this.game.player.x - marketPoint.x,
@@ -425,6 +515,7 @@ export class InvestmentSystem {
     });
   }
   sale(at: Point) {
+    const { tillPoint } = this.game.stage.layout;
     const income = 2 + this.economy.market;
     this.production.uncollected += income;
     this.economy.sold++;
@@ -433,6 +524,14 @@ export class InvestmentSystem {
     this.game.event("save", at);
   }
   step(dt: number) {
+    const {
+      inputPoint,
+      sawPoint,
+      outputPoint,
+      marketPoint,
+      customerPoint,
+      tillPoint,
+    } = this.game.stage.layout;
     const g = this.game,
       p = this.production,
       e = this.economy;
@@ -464,7 +563,7 @@ export class InvestmentSystem {
       );
     } else if (
       near(outputPoint, 48) &&
-      p.output > this.hauler.cargo &&
+      p.output > this.reservedOutput &&
       p.carried < stats(g.s).capacity &&
       this.unloadClock >= 0.09
     ) {
@@ -516,10 +615,10 @@ export class InvestmentSystem {
       const target = h.phase === "deliver" ? marketPoint : outputPoint;
       // Use the back aisle so loaded haulers do not cut through the player's foreground.
       const via =
-        h.phase === "deliver" && h.x < 565
-          ? { x: 575, y: 365 }
-          : h.phase === "return" && h.x > 335
-            ? { x: 325, y: 365 }
+        h.phase === "deliver" && h.x < marketPoint.x - 45
+          ? { x: marketPoint.x - 35, y: sawPoint.y - 65 }
+          : h.phase === "return" && h.x > outputPoint.x + 40
+            ? { x: outputPoint.x + 30, y: sawPoint.y - 65 }
             : target;
       const dx = via.x - h.x,
         dy = via.y - h.y,
@@ -535,7 +634,7 @@ export class InvestmentSystem {
         h.clock += dt;
         if (
           h.phase === "take" &&
-          p.output > h.cargo &&
+          p.output > this.reservedOutput &&
           h.clock >= 0.1 &&
           e.stock < this.storageCapacity
         ) {
@@ -545,8 +644,15 @@ export class InvestmentSystem {
           this.transfer(outputPoint, h, "plank", 0.8);
           // Cargo remains in saved output until delivery; reservations are excluded visually.
           p.output++;
-          if (h.cargo >= Math.min(6, p.output)) h.phase = "deliver";
-        } else if (h.phase === "take" && h.cargo > 0 && p.output <= h.cargo) {
+          if (
+            h.cargo >= Math.min(6, p.output - (this.reservedOutput - h.cargo))
+          )
+            h.phase = "deliver";
+        } else if (
+          h.phase === "take" &&
+          h.cargo > 0 &&
+          p.output <= this.reservedOutput
+        ) {
           h.phase = "deliver";
         } else if (
           h.phase === "deliver" &&

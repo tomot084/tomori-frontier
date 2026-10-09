@@ -1,6 +1,7 @@
+import { getStage } from "./stages";
+import { contentCatalog, isContent } from "./content";
 import { upgradeLimit } from "./data";
 import {
-  buildingData,
   resourceData,
   stats,
   cost,
@@ -8,10 +9,8 @@ import {
   type Resource,
   type Upgrade,
 } from "./data";
-import { GameModel, camps } from "./simulation";
+import { GameModel } from "./simulation";
 import {
-  investmentTiles,
-  marketPoint,
   investmentGroups,
   investmentGroup,
   machineOffers,
@@ -57,7 +56,8 @@ export class GameUI {
   }
   constructor(
     public model: GameModel,
-    private buy: (u: Upgrade) => void,
+    buy: (u: Upgrade) => void,
+    private travel?: () => void,
   ) {
     el("investment-filters").onclick = (event) => {
       const button = (event.target as Element).closest<HTMLButtonElement>(
@@ -93,7 +93,7 @@ export class GameUI {
       );
       if (!button || button.disabled) return;
       const id = button.dataset.investment as Investment;
-      const tile = investmentTiles.find((t) => t.id === id)!;
+      const tile = this.model.investments.tiles.find((t) => t.id === id)!;
       const nearby =
         Math.hypot(tile.x - model.player.x, tile.y - model.player.y) < 100;
       if (!nearby) {
@@ -109,6 +109,20 @@ export class GameUI {
       }
     };
     el("market-action").onclick = (event) => {
+      const target = event.target as Element;
+      if (target.closest("#stage-travel")) {
+        this.travel?.();
+        return;
+      }
+      const route = target.closest<HTMLButtonElement>("[data-board-route]");
+      if (route) {
+        model.investments.economy.boardRoute = route.dataset.boardRoute as
+          "build" | "market";
+        model.event("save", model.player);
+        this.investmentKey = "";
+        this.update(true);
+        return;
+      }
       if (
         (event.target as Element).closest("button") &&
         model.investments.supply()
@@ -156,7 +170,7 @@ export class GameUI {
       "三つの島を復旧。暁の灯りが戻った！",
     ];
     const card = el("unlock");
-    card.innerHTML = `<i>✦</i><div><small>開拓が進んだ！</small><b>${buildingData[index].name} 完成</b><span>${rewards[index]}</span></div>`;
+    card.innerHTML = `<i>✦</i><div><small>開拓が進んだ！</small><b>${this.model.stage.buildings[index].name} 完成</b><span>${rewards[index]}</span></div>`;
     card.hidden = false;
     clearTimeout(this.unlockTimer);
     this.unlockTimer = window.setTimeout(() => (card.hidden = true), 4500);
@@ -172,6 +186,8 @@ export class GameUI {
       st = stats(s);
     const system = this.model.investments,
       economy = system.economy;
+    const camps = this.model.stage.camps;
+    const { marketPoint, inputPoint } = this.model.stage.layout;
     const nearest = system.nearest;
     el("invest-toggle").hidden =
       !started || this.investmentOpen || this.shopOpen;
@@ -212,11 +228,19 @@ export class GameUI {
     ]);
     if (this.investmentOpen && investmentKey !== this.investmentKey) {
       this.investmentKey = investmentKey;
-      const catalog = [...investmentTiles].sort(
+      const catalog = [...this.model.investments.tiles].sort(
         (a, b) =>
           (system.offer(a.id).unlock > s.zone ? 1 : 0) -
             (system.offer(b.id).unlock > s.zone ? 1 : 0) ||
           [
+            "orchard",
+            "lumberCamp",
+            "minerCamp",
+            "kiln",
+            "splitter",
+            "snare",
+            "shrine",
+            "portal",
             "turret",
             "drill",
             "collector",
@@ -239,6 +263,14 @@ export class GameUI {
             "bounty",
           ].indexOf(a.id) -
             [
+              "orchard",
+              "lumberCamp",
+              "minerCamp",
+              "kiln",
+              "splitter",
+              "snare",
+              "shrine",
+              "portal",
               "turret",
               "drill",
               "collector",
@@ -262,7 +294,7 @@ export class GameUI {
             ].indexOf(b.id),
       );
       const items = this.selectedInvestment
-        ? investmentTiles.filter(
+        ? this.model.investments.tiles.filter(
             (t) =>
               t.id === this.selectedInvestment ||
               (this.selectedInvestment === "turret" &&
@@ -271,7 +303,9 @@ export class GameUI {
         : catalog.filter(
             (t) =>
               this.investmentFilter === "すべて" ||
-              investmentGroup(t.id) === this.investmentFilter,
+              (isContent(t.id)
+                ? contentCatalog[t.id].group
+                : investmentGroup(t.id)) === this.investmentFilter,
           );
       el("investment-filters").hidden = !!this.selectedInvestment;
       el("investment-filters").innerHTML = investmentGroups
@@ -302,22 +336,24 @@ export class GameUI {
         ) < 100;
       const p = system.production;
       el("market-action").innerHTML =
-        this.selectedInvestment === "drill"
-          ? `<div class="market-card"><b>採掘機の石材 ${economy.drillStock ?? 0} / 500</b><p>岩が戻るたびに掘ります。近づくと石材を受け取れます。</p></div>`
-          : this.selectedInvestment === "collector"
-            ? `<div class="market-card"><b>回収塔の在庫</b><p>${
-                Object.entries(economy.towerStock ?? {})
-                  .map(
-                    ([kind, count]) =>
-                      `${resourceData[kind as Resource].name} ${count}`,
-                  )
-                  .join(" · ") || "周辺の戦利品を待っています"
-              }</p><p>光の輪の内側を吸引。塔のそばで受け取れます。</p></div>`
-            : this.selectedInvestment === "market"
-              ? `<div class="market-card"><b>板材1 → ✦ ${2 + economy.market}<span>販売済 ${economy.sold}枚</span></b><p>製材所のOUTPUTで板材を拾って市場へ。市場に立つと1枚ずつ販売。金庫へ近づいて灯貨を回収。</p><p>運ぶ板材 ${p.carried} · 市場在庫 ${economy.stock} · 未回収 ✦ ${p.uncollected}</p><button id="market-supply" ${!atMarket || (!p.carried && !economy.stock) ? "disabled" : ""}>市場の板材を販売する</button></div>`
-              : this.selectedInvestment === "sawmill"
-                ? `<div class="market-card"><b>丸太 → 板材 → 灯貨</b><p>右のINPUTへ近づくと1本ずつ投入。最初は製材所のそばで作業し、左のOUTPUTから板材を運びます。</p><p>INPUT ${p.input} · 製材中 ${p.processing} · OUTPUT ${p.output} / ${system.outputCapacity}</p></div>`
-                : "";
+        this.selectedInvestment && isContent(this.selectedInvestment)
+          ? `<div class="market-card"><b>${contentCatalog[this.selectedInvestment].name}</b><p>${this.selectedInvestment === "kiln" ? `投入 木${economy.workshops?.kilnWood ?? 0} · 石${economy.workshops?.kilnStone ?? 0} · レンガ${economy.workshops?.brick ?? 0}。近づくと木・石を投入し、出荷係が市場へ運びます。` : this.selectedInvestment === "orchard" ? `実の在庫 ${economy.workshops?.food ?? 0}。近づいて受け取れます。` : this.selectedInvestment === "minerCamp" ? `石の在庫 ${economy.workshops?.stone ?? 0}。近づいて受け取れます。` : this.selectedInvestment === "shrine" ? (economy.bossDefeated ? "守護獣を討伐済み。祠に灯りが戻りました。" : "修復すると大型の守護獣が現れます。地面の予兆から離れて戦おう。") : contentCatalog[this.selectedInvestment].benefit}</p>${this.selectedInvestment === "splitter" && system.content("splitter") ? `<div class="route-options"><button data-board-route="build" aria-pressed="${economy.boardRoute !== "market"}">建築へ</button><button data-board-route="market" aria-pressed="${economy.boardRoute === "market"}">市場へ</button></div>` : ""}${this.selectedInvestment === "portal" && system.content("portal") ? `<button id="stage-travel">${getStage(this.model.stage.destination).name}へ渡る</button><p>設備と建築進行は群島ごとに保存されます。</p>` : ""}</div>`
+          : this.selectedInvestment === "drill"
+            ? `<div class="market-card"><b>採掘機の石材 ${economy.drillStock ?? 0} / 500</b><p>岩が戻るたびに掘ります。近づくと石材を受け取れます。</p></div>`
+            : this.selectedInvestment === "collector"
+              ? `<div class="market-card"><b>回収塔の在庫</b><p>${
+                  Object.entries(economy.towerStock ?? {})
+                    .map(
+                      ([kind, count]) =>
+                        `${resourceData[kind as Resource].name} ${count}`,
+                    )
+                    .join(" · ") || "周辺の戦利品を待っています"
+                }</p><p>光の輪の内側を吸引。塔のそばで受け取れます。</p></div>`
+              : this.selectedInvestment === "market"
+                ? `<div class="market-card"><b>板材1 → ✦ ${2 + economy.market}<span>販売済 ${economy.sold}枚</span></b><p>製材所のOUTPUTで板材を拾って市場へ。市場に立つと1枚ずつ販売。金庫へ近づいて灯貨を回収。</p><p>運ぶ板材 ${p.carried} · 市場在庫 ${economy.stock} · 未回収 ✦ ${p.uncollected}</p><button id="market-supply" ${!atMarket || (!p.carried && !economy.stock) ? "disabled" : ""}>市場の板材を販売する</button></div>`
+                : this.selectedInvestment === "sawmill"
+                  ? `<div class="market-card"><b>丸太 → 板材 → 灯貨</b><p>右のINPUTへ近づくと1本ずつ投入。最初は製材所のそばで作業し、左のOUTPUTから板材を運びます。</p><p>INPUT ${p.input} · 製材中 ${p.processing} · OUTPUT ${p.output} / ${system.outputCapacity}</p></div>`
+                  : "";
     }
     const key =
       JSON.stringify(s.resources) + st.capacity + system.production.carried;
@@ -361,7 +397,7 @@ export class GameUI {
     el("hp-value").textContent = `${Math.ceil(s.hp)} / ${st.hp}`;
     el("chapter").textContent = s.won
       ? "ALL CLEAR"
-      : `島 ${Math.min(s.zone + 1, 3)} / 3`;
+      : `${this.model.stage.id === "frontier" ? "島" : this.model.stage.name.replace("群島", "")} ${Math.min(s.zone + 1, 3)} / 3`;
     const goalKey = JSON.stringify([
       this.model.guidance,
       s.zone,
@@ -379,12 +415,12 @@ export class GameUI {
     ]);
     if (goalKey !== this.lastGoal) {
       this.lastGoal = goalKey;
-      if (s.won)
+      if (s.won && !system.focus)
         el("goal").innerHTML =
           "<b>三つの島に、灯りが戻った！</b><small>探索と強化を続けられます</small>";
       else {
-        const b = buildingData[s.zone],
-          p = s.progress[s.zone];
+        const b = this.model.stage.buildings[Math.min(2, s.zone)],
+          p = s.progress[Math.min(2, s.zone)];
         const guide = this.model.guidance;
         const total = Object.values(b.cost).reduce((a, n) => a + n, 0),
           done = Object.values(p).reduce((a, n) => a + n, 0);
@@ -396,12 +432,14 @@ export class GameUI {
         const arrow =
           arrows[(Math.round(Math.atan2(sy, sx) / (Math.PI / 4)) + 8) % 8];
         const building = guide.kind === "build";
-        const focused = investmentTiles.find((t) => t.id === system.focus);
+        const focused = this.model.investments.tiles.find(
+          (t) => t.id === system.focus,
+        );
         const title = building
           ? s.zone === 0 &&
             economy.sold < 5 &&
-            guide.target.x === 465 &&
-            guide.target.y === 430
+            guide.target.x === inputPoint.x &&
+            guide.target.y === inputPoint.y
             ? "製材所INPUTへ丸太を届けよう"
             : "橋へ素材を届けよう"
           : `${resourceData[guide.kind as Resource].name}をあと${guide.remaining}集めよう`;

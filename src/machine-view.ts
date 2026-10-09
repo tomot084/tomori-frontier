@@ -5,7 +5,7 @@ import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Art, palette, worldPoint, color } from "./models";
-import { turretPoint, drillPoint, towerPoint } from "./investments";
+
 import type { GameModel, Point } from "./simulation";
 import type { Machine } from "./data";
 interface Site {
@@ -33,16 +33,17 @@ export class MachineView {
   crates: InstancedMesh[] = [];
   labels: HTMLElement[] = [];
   constructor(
-    private art: Art,
+    art: Art,
     private game: GameModel,
     overlay: HTMLElement,
   ) {
+    const { turretPoint, drillPoint, towerPoint } = game.stage.layout;
     const a = art;
-    for (const [id, at, zone] of [
-      ["turret", turretPoint, 1],
-      ["drill", drillPoint, 1],
-      ["collector", towerPoint, 2],
-    ] as [Machine, Point, number][]) {
+    for (const [id, at] of [
+      ["turret", turretPoint],
+      ["drill", drillPoint],
+      ["collector", towerPoint],
+    ] as [Machine, Point][]) {
       const parts = [
         a.box(`${id}-foundation`, 0, 0.12, 0, 2.7, 0.24, 2.7, palette.stone),
       ];
@@ -138,7 +139,7 @@ export class MachineView {
       this.sites.push({
         id,
         at,
-        zone,
+        zone: game.investments.offer(id).unlock,
         foundation,
         root,
         owned,
@@ -347,7 +348,7 @@ export class MachineView {
           : site.id === "collector"
             ? `保管 ${Object.values(i.economy.towerStock ?? {}).reduce((a, n) => a + (n ?? 0), 0)}`
             : "自動砲台"
-        : `${["自動砲台 150", "自動採掘機 120", "資源回収塔 140"][k]}灯貨`;
+        : `${["自動砲台", "自動採掘機", "資源回収塔"][k]} ${i.offer(site.id).price}灯貨`;
       place(
         this.labels[k],
         worldPoint(site.at.x, site.at.y + 44, 0.3),

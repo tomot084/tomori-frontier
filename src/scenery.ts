@@ -1,3 +1,4 @@
+import { getStage, type StageDefinition } from "./stages";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
@@ -7,14 +8,19 @@ import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Art, palette, color, worldPoint } from "./models";
-import { buildingData } from "./data";
-import { camps } from "./simulation";
+
 const rand = (n: number) => {
   const v = Math.sin(n * 39.7 + 17.5) * 41713.13;
   return v - Math.floor(v);
 };
 /** Bevelled islands have separate meadow, shoreline lip and stratified cliff faces. */
-function island(art: Art, zone: number, start: number, end: number) {
+function island(
+  art: Art,
+  zone: number,
+  start: number,
+  end: number,
+  stage: StageDefinition,
+) {
   const outline: number[][] = [];
   const x0 = 65,
     x1 = 835;
@@ -42,7 +48,7 @@ function island(art: Art, zone: number, start: number, end: number) {
     const co = color(hex);
     for (let i = 0; i < 3; i++) colors.push(co.r, co.g, co.b, 1);
   }
-  const grass = [0xbdd6a2, 0x94c3ad, 0xc3c9a2][zone],
+  const grass = stage.areas[zone].grass,
     center = worldPoint(450, (start + end) / 2, 0.02);
   for (let i = 0; i < outline.length; i++) {
     const j = (i + 1) % outline.length;
@@ -65,7 +71,7 @@ function island(art: Art, zone: number, start: number, end: number) {
     midB.y = -0.6;
     midA.x *= 1.02;
     midB.x *= 1.02;
-    triangle(edgeA, midA, edgeB, [0x9d9074, 0x9a947b, 0x93998c][zone]);
+    triangle(edgeA, midA, edgeB, stage.areas[zone].cliff);
     triangle(edgeB, midA, midB, 0x9f9278);
     const bottomA = midA.clone(),
       bottomB = midB.clone();
@@ -127,18 +133,16 @@ export interface BuiltSite {
   marker: Mesh;
   progress: number;
 }
-export function makeScenery(art: Art) {
+export function makeScenery(art: Art, stage = getStage()) {
+  const camps = stage.camps,
+    buildingData = stage.buildings;
   const zones: Mesh[][] = [[], [], []],
     shadowCasters: Mesh[] = [];
   const water = art.box("quiet-tide", 0, -1.65, -18, 110, 0.1, 120, 0x65aeb7);
   water.receiveShadows = false;
-  const ranges = [
-    [-80, 692],
-    [768, 1242],
-    [1318, 1965],
-  ];
+  const ranges = stage.areas.map((a) => [a.start, a.end]);
   ranges.forEach(([start, end], zone) => {
-    zones[zone].push(island(art, zone, start, end));
+    zones[zone].push(island(art, zone, start, end, stage));
     const details: Mesh[] = [];
     // Continuous curved ribbon, avoiding overlapping triangulated path discs.
     const pathEdges = [-1, 1].map((side) =>
