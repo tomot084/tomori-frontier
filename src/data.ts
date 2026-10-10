@@ -140,6 +140,8 @@ export const machineIds = [
 ] as const;
 export type Machine = (typeof machineIds)[number];
 export interface Economy {
+  raidClears?: number;
+  raidReward?: number;
   content?: Partial<Record<ContentId, number>>;
   workshops?: Partial<Record<string, number>>;
   discoveries?: string[];
@@ -276,6 +278,20 @@ export function load(raw: string | null): Save {
       ...(v.stage !== undefined ? { stage: getStage(v.stage).id } : {}),
       economy: v.economy
         ? {
+            ...(v.economy.raidReward !== undefined
+              ? {
+                  raidReward: Number.isSafeInteger(v.economy.raidReward)
+                    ? Math.max(0, Math.min(80, v.economy.raidReward))
+                    : 0,
+                }
+              : {}),
+            ...(v.economy.raidClears !== undefined
+              ? {
+                  raidClears: Number.isInteger(v.economy.raidClears)
+                    ? Math.max(0, Math.min(2, v.economy.raidClears))
+                    : 0,
+                }
+              : {}),
             ...(v.economy.content
               ? {
                   content: Object.fromEntries(

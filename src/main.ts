@@ -92,6 +92,7 @@ function boot() {
     "tile-action",
     "investment-options",
     "market-action",
+    "goal",
   ])
     el(id).addEventListener("click", release);
   el("shop-toggle").addEventListener("click", release);
@@ -189,6 +190,7 @@ function boot() {
         buildings: model.stage.buildings,
         treasures: model.stage.treasures,
         contents: model.stage.contents,
+        raid: model.stage.raid,
       }),
       save: persist,
       input: (x: number, y: number) => {
@@ -196,6 +198,7 @@ function boot() {
       },
       inspect: () => ({
         guidance: model.guidance,
+        raid: model.raid.metrics(),
         feedback: feedback.metrics(),
         investments: {
           economy: model.investments.economy,

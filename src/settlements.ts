@@ -66,6 +66,15 @@ export class Settlements {
     return e.workshops;
   }
   enemySpeed(enemy: Point) {
+    if (
+      this.game.raid.active &&
+      this.owned("snare") &&
+      Math.hypot(
+        enemy.x - this.game.stage.raid!.x,
+        enemy.y - this.game.stage.raid!.y,
+      ) < 210
+    )
+      return 0.4;
     return this.owned("snare") &&
       Math.hypot(
         enemy.x - this.place("snare").x,
@@ -384,7 +393,7 @@ export class Settlements {
         );
       }
     }
-    if (this.owned("shrine")) {
+    if (this.owned("shrine") && !g.raid.active) {
       const place = this.place("shrine"),
         boss = g.enemies.at(-1)!;
       if (!this.bossActive) {

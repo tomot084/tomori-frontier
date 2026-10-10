@@ -76,7 +76,12 @@ export class WorldMachines {
         sy = ny - s.y,
         length = sx * sx + sy * sy;
       for (const enemy of g.enemies) {
-        if (enemy.dead || enemy.zone > g.s.zone) continue;
+        if (
+          enemy.dead ||
+          enemy.zone > g.s.zone ||
+          (g.raid.active && !g.raid.owns(enemy))
+        )
+          continue;
         const t = Math.max(
           0,
           Math.min(
@@ -110,7 +115,12 @@ export class WorldMachines {
         nearest = Infinity,
         next = Infinity;
       for (const enemy of g.enemies) {
-        if (enemy.dead || enemy.zone > g.s.zone) continue;
+        if (
+          enemy.dead ||
+          enemy.zone > g.s.zone ||
+          (g.raid.active && !g.raid.owns(enemy))
+        )
+          continue;
         const distance = Math.hypot(
           enemy.x - turretPoint.x,
           enemy.y - turretPoint.y,

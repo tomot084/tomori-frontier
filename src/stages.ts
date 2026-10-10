@@ -35,6 +35,7 @@ export interface StageDefinition {
   investments: Record<string, Location>;
   contents: ContentPlacement[];
   treasures: (Location & { id: string; zone: number; coin: number })[];
+  raid?: Location & { unlock: number; lanes: (Location & { name: string })[] };
   resourceSeed: number;
   machineRules?: Partial<Record<Machine, { price?: number; unlock?: number }>>;
   drillNodeId?: string;
@@ -89,6 +90,16 @@ export const frontierStage: StageDefinition = {
   destination: "frost",
   spawn: { x: 450, y: 360 },
   resourceSeed: 0,
+  raid: {
+    x: 500,
+    y: 1040,
+    unlock: 1,
+    lanes: [
+      { x: 180, y: 1040, name: "西" },
+      { x: 790, y: 1040, name: "東" },
+      { x: 500, y: 800, name: "北" },
+    ],
+  },
   areas: [
     {
       id: "meadow",
@@ -140,6 +151,16 @@ export const frostStage: StageDefinition = {
   destination: "frontier",
   spawn: { x: 450, y: 360 },
   resourceSeed: 23,
+  raid: {
+    x: 470,
+    y: 1050,
+    unlock: 1,
+    lanes: [
+      { x: 150, y: 1050, name: "西" },
+      { x: 790, y: 1050, name: "東" },
+      { x: 470, y: 800, name: "北" },
+    ],
+  },
   areas: [
     {
       id: "frostwood",

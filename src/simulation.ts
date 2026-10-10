@@ -1,3 +1,4 @@
+import { DefenseRaid } from "./raid";
 import { getStage, type StageDefinition } from "./stages";
 import { Settlements } from "./settlements";
 import { WorldMachines } from "./world-machines";
@@ -89,6 +90,7 @@ export class GameModel {
   readonly investments = new InvestmentSystem(this);
   readonly machines = new WorldMachines(this);
   readonly settlements = new Settlements(this);
+  readonly raid = new DefenseRaid(this);
   miningNodeId = "node-1-13";
   get stage(): StageDefinition {
     return getStage(this.s.stage);
@@ -304,6 +306,8 @@ export class GameModel {
     target: Point;
     remaining: number;
   } {
+    if (this.raid.active)
+      return { kind: "build", target: this.stage.raid!, remaining: 0 };
     if (this.investments.focus) {
       const tile = this.investments.tiles.find(
         (t) => t.id === this.investments.focus,
@@ -451,7 +455,8 @@ export class GameModel {
     this.spawn(
       e,
       "coin",
-      enemyData[e.type].drop + this.investments.level("bounty") * 2,
+      (this.raid.owns(e) ? 1 : enemyData[e.type].drop) +
+        this.investments.level("bounty") * 2,
     );
     this.spawn(e, "food", 2);
     this.burst(e, 0xffdc88, 6);
@@ -515,6 +520,7 @@ export class GameModel {
       Math.hypot(this.player.x - portal.x, this.player.y - portal.y) > 100
     )
       return null;
+    this.raid.finish("cancelled");
     const current = this.snapshot();
     const worlds = {
       ...current.worlds,
@@ -623,11 +629,14 @@ export class GameModel {
     let nearest: Enemy | undefined,
       dist = Infinity,
       chasing = 0;
-    const safe = this.atCamp;
+    this.raid.step(dt);
+    const safe = this.atCamp && !this.raid.active;
     for (const e of this.enemies) {
+      if (this.raid.active && !this.raid.owns(e)) continue;
       if (e.zone > this.s.zone) continue;
       if (e.type === 5 && this.investments.economy.bossDefeated) continue;
       if (e.dead) {
+        if (this.raid.owns(e)) continue;
         if (time > e.dead) {
           e.dead = 0;
           e.hp = enemyData[e.type].hp;
@@ -644,7 +653,13 @@ export class GameModel {
         dist = distance;
         nearest = e;
       }
-      if (distance < 260 && distance > d.range && !safe && chasing++ < 8) {
+      if (
+        !this.raid.owns(e) &&
+        distance < 260 &&
+        distance > d.range &&
+        !safe &&
+        chasing++ < 8
+      ) {
         e.x +=
           ((p.x - e.x) / distance) *
           d.speed *
@@ -668,6 +683,7 @@ export class GameModel {
         this.event("hit", p, { id: "player", kind: "enemy" });
         this.pop(p, `−${d.attack}`, 0xff8d7c);
         if (this.s.hp <= 0) {
+          this.raid.finish("failed");
           this.s.hp = st.hp;
           p.x = this.stage.spawn.x;
           p.y = this.stage.spawn.y - 30;
@@ -681,6 +697,7 @@ export class GameModel {
       for (const e of this.enemies) {
         if (
           e.dead ||
+          (this.raid.active && !this.raid.owns(e)) ||
           e.zone > this.s.zone ||
           Math.hypot(e.x - p.x, e.y - p.y) >= 108
         )

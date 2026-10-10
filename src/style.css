@@ -1466,3 +1466,31 @@ dialog #close {
 
 #reset-confirm[hidden], #reset[hidden] { display: none; }
 #reset-execute { background: #b64c41; color: #fff9e7; }
+
+.raid-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 5px;
+  pointer-events: auto;
+}
+.raid-actions button {
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid #9a7851;
+  background: #ffe2a1;
+  color: #3b3930;
+  font: inherit;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.raid-actions span {
+  font-size: 11px;
+  flex: 1;
+}
+
+#goal.raid-goal { display: block; }
+#goal.raid-goal b, #goal.raid-goal small { display: block; width: 100%; }
+#goal.raid-goal small { font-size: 12px; line-height: 1.4; margin-top: 3px; }
+#goal.raid-goal .goal-progress { display: block; margin-top: 5px; }

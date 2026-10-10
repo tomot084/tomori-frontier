@@ -1,3 +1,4 @@
+import { RaidView } from "./raid-view";
 import { SettlementView } from "./settlement-view";
 import { MachineView } from "./machine-view";
 import { visualStack, stackHeight, stackBulk } from "./cargo";
@@ -46,6 +47,7 @@ interface Fragment {
   life: number;
 }
 export class WorldView {
+  raidView!: RaidView;
   production!: ProductionView;
   machines!: MachineView;
   settlementView!: SettlementView;
@@ -252,6 +254,7 @@ export class WorldView {
     this.scenery = makeScenery(this.art, model.stage);
     this.production = new ProductionView(this.art, model, overlay);
     this.settlementView = new SettlementView(this.art, model, overlay);
+    this.raidView = new RaidView(this.art, model, overlay);
     this.machines = new MachineView(this.art, model, overlay);
     // Shared soft contact shadows ground the racks and machinery without a screen-space pass.
     for (const [x, y, w, d] of [
@@ -767,11 +770,12 @@ export class WorldView {
   }
   syncCargo() {
     const s = this.model.s,
-      key = `${s.resources.wood},${s.resources.stone},${s.resources.food},${this.model.investments.production.carried}`;
+      key = `${s.resources.wood},${s.resources.stone},${s.resources.food},${this.model.investments.production.carried},${this.model.raid.active}`;
     if (key === this.lastInventory) return;
     this.lastInventory = key;
-    const wood = visualStack(s.resources.wood),
-      stone = visualStack(s.resources.stone);
+    const pieces = this.model.raid.active ? 24 : 100;
+    const wood = Math.min(pieces, visualStack(s.resources.wood)),
+      stone = Math.min(pieces, visualStack(s.resources.stone));
     const bulk = stackBulk(s.resources.wood);
     this.rig.wood.forEach((m, i) => {
       m.setEnabled(i < wood);
@@ -827,7 +831,11 @@ export class WorldView {
     const dt = Math.min(delta, 240) / 1000;
     this.time += dt;
     const m = this.model;
+    this.rig.cargoRoot.scaling.setAll(m.raid.active ? 0.32 : 1);
     this.syncCargo();
+    this.raidView.update((el, at, visible) =>
+      this.place(el, worldPoint(at.x, at.y, 2), visible),
+    );
     this.settlementView.update((el, at, visible) =>
       this.place(el, at, visible),
     );
@@ -1452,6 +1460,8 @@ export class WorldView {
       ],
       cargo: {
         woodUnits: this.model.s.resources.wood,
+        raidCompact: this.model.raid.active,
+        visualLimit: this.model.raid.active ? 24 : 100,
         bulk: stackBulk(this.model.s.resources.wood),
         height: stackHeight(this.model.s.resources.wood),
         wood: this.rig.wood.filter((m) => m.isEnabled()).length,

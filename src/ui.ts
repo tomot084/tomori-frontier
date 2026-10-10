@@ -59,6 +59,14 @@ export class GameUI {
     buy: (u: Upgrade) => void,
     private travel?: () => void,
   ) {
+    el("goal").addEventListener("click", (event) => {
+      const id = (event.target as HTMLElement).closest("button")?.id;
+      if (id === "raid-start" || id === "raid-hard")
+        this.model.raid.start(id === "raid-hard" ? 2 : 1);
+      if (id === "raid-cancel") this.model.raid.finish("cancelled");
+      this.lastGoal = "";
+      this.update(true);
+    });
     el("investment-filters").onclick = (event) => {
       const button = (event.target as Element).closest<HTMLButtonElement>(
         "button[data-filter]",
@@ -398,7 +406,15 @@ export class GameUI {
     el("chapter").textContent = s.won
       ? "ALL CLEAR"
       : `${this.model.stage.id === "frontier" ? "島" : this.model.stage.name.replace("群島", "")} ${Math.min(s.zone + 1, 3)} / 3`;
+    const raid = this.model.raid;
+    const raidShown =
+      started &&
+      !this.investmentOpen &&
+      !this.shopOpen &&
+      (raid.active || raid.near);
+    el("goal").classList.toggle("raid-goal", !!raidShown);
     const goalKey = JSON.stringify([
+      raidShown,
       this.model.guidance,
       s.zone,
       s.progress,
@@ -413,7 +429,7 @@ export class GameUI {
       Math.round(this.model.player.x / 30),
       Math.round(this.model.player.y / 30),
     ]);
-    if (goalKey !== this.lastGoal) {
+    if (!raidShown && goalKey !== this.lastGoal) {
       this.lastGoal = goalKey;
       if (s.won && !system.focus)
         el("goal").innerHTML =
@@ -449,6 +465,7 @@ export class GameUI {
     }
     const line = system.production;
     if (
+      !raidShown &&
       !system.focus &&
       s.zone === 0 &&
       (line.carried ||
@@ -459,6 +476,29 @@ export class GameUI {
     ) {
       el("goal").innerHTML =
         `<b>${line.uncollected ? "市場の金庫へ → 灯貨を回収" : line.carried ? "板材を市場へ → 灯貨を回収" : line.output ? "OUTPUTの板材を拾って市場へ" : line.input || line.processing ? "丸太 → 製材 → 板材" : "丸太を製材所INPUTへ運ぼう"}</b>`;
+    }
+    if (raidShown) {
+      this.lastGoal = "";
+      if (!el("raid-title"))
+        el("goal").innerHTML =
+          '<b id="raid-title"></b><small id="raid-status"></small><i id="raid-progress" class="goal-progress"></i><div class="raid-actions"><button id="raid-start"></button><button id="raid-hard">猛襲に挑む</button><span id="raid-note"></span><button id="raid-cancel">中断</button></div>';
+      el("raid-title").textContent = raid.active
+        ? `灯標防衛 ${raid.tier === 2 ? "猛襲" : "襲撃"} · 第${raid.wave}波 / 3`
+        : `灯標防衛${raid.result === "victory" ? " · 防衛成功！" : raid.result === "failed" ? " · 再挑戦しよう" : " · 群れを迎え撃つ"}`;
+      el("raid-status").textContent = raid.active
+        ? `灯標 ${raid.hp}/100 · ${raid.countdown > 0 ? `${raid.laneNames}から ${Math.ceil(raid.countdown)}秒後` : `${raid.laneNames} · 残り${raid.metrics().alive}体`}`
+        : "3波の群れから灯標を守る。砲台・霧止めが援護";
+      el("raid-start").textContent = raid.result ? "再挑戦" : "防衛開始";
+      el("raid-start").hidden = raid.active;
+      el("raid-hard").hidden = raid.active || !(economy.raidClears ?? 0);
+      el("raid-cancel").hidden = !raid.active;
+      el("raid-note").textContent = raid.active
+        ? "外周で迎撃 · 荷物は縮小表示"
+        : (economy.raidClears ?? 0) > 0
+          ? ""
+          : "初防衛 +30灯貨";
+      el("raid-progress").hidden = !raid.active;
+      el("raid-progress").style.setProperty("--progress", `${raid.hp}%`);
     }
     const ready =
       s.levels.gather === 0 && s.resources.coin >= cost(s, "gather");
