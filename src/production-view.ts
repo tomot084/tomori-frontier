@@ -126,18 +126,10 @@ export class ProductionView {
               ),
             );
         }
-        // Fixed cut ends are a material sample, separate from live stock.
-        for (let i = 0; i < 6; i++) {
-          const log = art.log("cradle-material-sample");
-          log.scaling.setAll(1.65);
-          log.rotation.y = Math.PI / 2;
-          log.position.set(
-            ((i % 3) - 1) * 0.48,
-            0.44 + Math.floor(i / 3) * 0.43,
-            -0.3,
-          );
-          fittings.push(log);
-        }
+        // Keep empty stock racks honest: mark the intake without fake logs.
+        fittings.push(
+          art.box("raw-intake-marker", 0, 0.22, -0.84, 2.2, 0.18, 0.14, 0xd28d46),
+        );
       } else if (kind === "plank") {
         for (const z of [-0.6, 0.6])
           fittings.push(
@@ -152,32 +144,11 @@ export class ProductionView {
               palette.wood,
             ),
           );
-        for (let i = 0; i < 5; i++)
-          fittings.push(
-            art.box(
-              "lumber-material-sample",
-              0,
-              0.37 + i * 0.15,
-              -0.28,
-              1.95,
-              0.12,
-              0.38,
-              palette.cut,
-            ),
-          );
-        for (const x of [-0.65, 0.65])
-          fittings.push(
-            art.box(
-              "lumber-binding",
-              x,
-              0.69,
-              -0.28,
-              0.08,
-              0.8,
-              0.41,
-              palette.teal,
-            ),
-          );
+        // The live plank pile is the only inventory representation.
+        // A contrasting end rail identifies the empty output rack.
+        fittings.push(
+          art.box("processed-output-marker", 0, 0.22, -0.84, 2.2, 0.18, 0.14, 0x218e91),
+        );
       } else {
         fittings.push(
           art.box("coin-till", 0, 0.55, 0, 1.2, 1, 0.85, palette.teal),
