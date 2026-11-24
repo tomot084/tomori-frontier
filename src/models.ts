@@ -256,47 +256,71 @@ export class Art {
         : nx + nz > 0.35 ? 0x82b6c4 : 0x537d95,
     );
   }
+  /** Rounded, broad foliage with a dark underside and sunlit crown.
+   *  One shared material; no textures, extra draw calls or runtime animation.
+   */
+  private foliage(
+    x: number, y: number, z: number, w: number, h: number, d: number,
+    lower: number, upper: number,
+  ) {
+    const leaf = this.sphere("sculpted-crown", x, y, z, w, h, d, upper);
+    return this.paintItem(leaf, (_x, py, _z, _nx, ny) =>
+      py > -0.05 && ny > -0.15 ? upper : lower);
+  }
   private themedTree(seed: number, zone: number, harvestable: boolean) {
     const biome = this.biome, parts: Mesh[] = [];
+    const trunk = harvestable ? 0x985f37 : 0x97896d;
     if (biome === "snow" || biome === "forest" || biome === "ice") {
-      const icy = biome === "ice";
-      parts.push(this.cylinder("theme-trunk", 0, 0.7, 0, 0.21, 0.30, 1.4, icy ? 0x589db4 : palette.wood));
+      const icy = biome === "ice", snowy = biome === "snow";
+      parts.push(this.cylinder("pine-trunk", 0, 0.78, 0, 0.20, 0.32, 1.56, icy ? 0x589db4 : trunk, 12));
       for (let i = 0; i < 3; i++) {
-        const radius = (1 - i * 0.23) * (icy ? 0.84 : 1), y = 1.22 + i * 0.66;
-        const tint = icy ? [0x4c9bc6, 0x8bd9eb, 0xc7f2f6][i]
-          : (harvestable ? [0x247954, 0x328c5a, 0x50a46a] : [0x598c70, 0x6b9b7b, 0x87b396])[i];
-        parts.push(this.cylinder("theme-pine-tier", 0, y, 0, 0.05, radius, 1.1, tint, 12));
-        if (biome === "snow")
-          parts.push(this.cylinder("snow-cap", 0, y + 0.24, 0, 0.025, radius * 0.76, 0.76, 0xf0f7f4, 12));
+        const r = 1.08 - i * 0.24, y = 1.28 + i * 0.69;
+        if (icy) {
+          const crystal = this.cylinder("frozen-crown", 0, y, 0, 0.05, r * 0.82, 1.25,
+            [0x4d95c2, 0x76c8e2, 0xb8eff4][i], 12);
+          parts.push(crystal);
+          parts.push(this.sphere("ice-glint", -r * 0.26, y + 0.19, -r * 0.31,
+            r * 0.50, 0.43, r * 0.28, 0xc3f4fa));
+        } else {
+          // Bulging foliage skirts, rather than three sharp traffic cones.
+          const green = harvestable ? [0x247953, 0x399451, 0x65ad56] : [0x628e73, 0x759c7a, 0x91af83];
+          parts.push(this.cylinder("pine-layer", 0, y, 0, r * 0.25, r, 0.92, green[i], 16));
+          parts.push(this.foliage(0, y - 0.28, 0, r * 2.02, 0.48, r * 1.94, green[Math.max(0,i-1)], green[i]));
+          if (snowy) {
+            parts.push(this.foliage(0, y + 0.22, 0, r * 1.48, 0.66, r * 1.44, 0xb7dce3, 0xf4fbf9));
+          }
+        }
       }
     } else if (biome === "desert") {
-      parts.push(this.cylinder("palm-trunk", 0, 1.23, 0, 0.17, 0.30, 2.46, 0xaa7649));
+      parts.push(this.cylinder("palm-trunk", 0, 1.25, 0, 0.16, 0.31, 2.5, 0xb27c46, 12));
+      for (let i = 0; i < 4; i++)
+        parts.push(this.cylinder("palm-ring", 0, 0.42 + i * 0.51, 0, 0.25 - i * 0.018, 0.26 - i * 0.018, 0.10, 0x845a3c, 12));
       for (let i = 0; i < 6; i++) {
-        const a = i * Math.PI / 3;
-        const leaf = this.sphere("palm-frond", Math.sin(a) * 0.60, 2.48, Math.cos(a) * 0.60,
-          0.44, 0.24, 1.52, i % 2 ? 0x68a24d : 0x3d8955);
+        const a = i * Math.PI / 3, dx = Math.sin(a), dz = Math.cos(a);
+        const leaf = this.foliage(dx * 0.71, 2.55, dz * 0.71, 0.54, 0.32, 1.76, 0x397c43, i % 2 ? 0x87bf50 : 0x58a34a);
         leaf.rotation.y = a;
-        leaf.rotation.x = 0.25;
+        leaf.rotation.x = 0.27;
         parts.push(leaf);
       }
-      parts.push(this.sphere("palm-heart", 0, 2.50, 0, 0.48, 0.52, 0.48, 0xd7b170));
+      for (const side of [-1, 1])
+        parts.push(this.sphere("coconut", side * 0.24, 2.34, 0.08, 0.32, 0.36, 0.34, 0x976035));
     } else if (biome === "volcano") {
-      parts.push(this.cylinder("charred-trunk", 0, 0.92, 0, 0.18, 0.39, 1.84, 0x56413c));
+      parts.push(this.cylinder("charred-trunk", 0, 0.89, 0, 0.23, 0.42, 1.78, 0x614039));
       for (const side of [-1, 1]) {
-        const branch = this.cylinder("charred-branch", side * 0.43, 1.72, 0, 0.09, 0.18, 1.02, 0x634740);
-        branch.rotation.z = -side * 0.54;
-        parts.push(branch, this.sphere("ember-crown", side * 0.61, 2.12, 0, 1, 0.87, 0.90, harvestable ? 0xc66b44 : 0x98705d));
+        const branch = this.cylinder("charred-branch", side * 0.41, 1.66, 0, 0.12, 0.21, 1.06, 0x75463a);
+        branch.rotation.z = -side * 0.55;
+        parts.push(branch, this.foliage(side * 0.63, 2.08, 0, 1.28, 1.02, 1.21, 0x994b36, harvestable ? 0xe9813e : 0xc18d67));
       }
-      parts.push(this.sphere("ember-crown", 0, 2.42, 0.06, 1.35, 1.18, 1.22, harvestable ? 0xe8a15a : 0xbb9271));
+      parts.push(this.foliage(0, 2.64, 0.04, 1.70, 1.40, 1.53, 0xc25b37, harvestable ? 0xffb85c : 0xd1a183));
     } else {
-      parts.push(this.cylinder("festival-trunk", 0, 0.81, 0, 0.23, 0.34, 1.62, 0xb2845c));
-      const shades = zone === 1 ? [0x76b8da, 0x9fd8e2] : [0xdd84b1, 0xf2b7c7];
+      parts.push(this.cylinder("festival-trunk", 0, 0.82, 0, 0.23, 0.34, 1.64, trunk));
+      const shades = zone === 1 ? [0x6198cb, 0xb2e2f1] : [0xb866a1, 0xf5b5d4];
       for (let i = 0; i < 3; i++)
-        parts.push(this.sphere("festival-topiary", (i - 1) * 0.55, 2.1 + (i === 1 ? 0.46 : 0), 0,
-          i === 1 ? 1.73 : 1.25, i === 1 ? 1.66 : 1.25, 1.35, shades[i % 2]));
+        parts.push(this.foliage((i - 1) * 0.62, 2.04 + (i === 1 ? 0.54 : 0), 0,
+          i === 1 ? 1.85 : 1.38, i === 1 ? 1.69 : 1.31, 1.44, shades[0], shades[1]));
     }
     if (harvestable)
-      parts.push(this.box("fresh-trunk-notch", 0, 0.53, -0.28, 0.27, 0.12, 0.08, palette.cut));
+      parts.push(this.box("fresh-trunk-notch", 0, 0.52, -0.30, 0.35, 0.15, 0.10, palette.cut));
     const mesh = this.merge(harvestable ? "harvestable-broadleaf-tree" : "decorative-forest-tree", parts);
     mesh.rotation.y = noise(seed) * Math.PI * 2;
     if (!harvestable) mesh.scaling.setAll(0.9 + noise(seed + zone) * 0.12);
@@ -305,50 +329,31 @@ export class Art {
   tree(seed: number, zone = 0, harvestable = true) {
     if (["forest", "snow", "ice", "volcano", "desert", "park"].includes(this.biome))
       return this.themedTree(seed, zone, harvestable);
-    // One family of broad, rounded crowns for both harvest and scenery trees.
-    // Background uses the same silhouette with quieter colors and smaller scale.
-    const parts = [
-      this.cylinder(
-        "grove-trunk",
-        0,
-        0.8,
-        0,
-        0.28,
-        0.39,
-        1.6,
-        harvestable ? palette.wood : 0xa49a7e,
-        12,
-      ),
+    // A broad-rooted trunk and distinct crown lobes form a recognizable oak.
+    const bark = harvestable ? 0x945c36 : 0xa19880;
+    const parts: Mesh[] = [
+      this.cylinder("grove-trunk", 0, 0.80, 0, 0.24, 0.42, 1.60, bark, 12),
+      this.cylinder("root-flare", 0, 0.15, 0, 0.39, 0.53, 0.30, bark, 12),
     ];
-    const leaves = harvestable
-      ? [0x329c62, 0x77bd57, 0x49ac67]
-      : [0x83a58b, 0x96b08a, 0x87a58c];
-    for (let i = 0; i < 3; i++)
-      parts.push(
-        this.sphere(
-          "grove-crown",
-          (i - 1) * 0.62,
-          2.08 + (i === 1 ? 0.58 : 0),
-          i === 1 ? 0.1 : 0,
-          i === 1 ? 1.95 : 1.6,
-          i === 1 ? 1.8 : 1.5,
-          i === 1 ? 1.8 : 1.5,
-          leaves[i],
-        ),
-      );
-    if (harvestable)
-      parts.push(
-        this.box(
-          "fresh-trunk-notch",
-          0,
-          0.55,
-          -0.35,
-          0.32,
-          0.12,
-          0.09,
-          palette.cut,
-        ),
-      );
+    for (const side of [-1, 1]) {
+      const branch = this.cylinder("oak-branch", side * 0.39, 1.37, 0, 0.12, 0.20, 1.08, bark, 12);
+      branch.rotation.z = -side * 0.64;
+      parts.push(branch);
+    }
+    const low = harvestable ? 0x267648 : 0x71907b;
+    const mid = harvestable ? 0x49a34c : 0x8da88a;
+    const high = harvestable ? 0x8bcc58 : 0xa8bb94;
+    parts.push(
+      this.foliage(-0.68, 1.99, 0.06, 1.68, 1.50, 1.56, low, mid),
+      this.foliage(0.68, 2.05, -0.08, 1.66, 1.60, 1.60, low, mid),
+      this.foliage(0, 2.52, 0.04, 1.98, 1.70, 1.76, mid, high),
+      this.foliage(-0.16, 2.12, -0.55, 1.52, 1.30, 1.22, mid, high),
+    );
+    if (harvestable) {
+      const notch = this.box("fresh-trunk-notch", 0, 0.55, -0.37, 0.36, 0.17, 0.11, palette.cut);
+      notch.rotation.z = 0.17;
+      parts.push(notch);
+    }
     const tree = this.merge(
       harvestable ? "harvestable-broadleaf-tree" : "decorative-forest-tree",
       parts,
@@ -382,66 +387,38 @@ export class Art {
       volcano: [0x514a52, 0xad7461], desert: [0xb78b51, 0xe5b977],
       forest: [0x668c75, 0x9bc3a2], park: [0x9a93bd, 0xd1b9df],
     };
-    const [base, face] = shades[this.biome] ?? [palette.stone, palette.stoneLight];
-    const a = this.rock("boulder", 1.65, base, seed);
-    const b = this.rock("cracked-face", 0.72, face, seed + 2);
-    b.position.set(-0.32, 0.13, -0.26);
-    const vein = this.box(
-      "mineral-vein",
-      0.14,
-      0.55,
-      -0.13,
-      0.07,
-      0.34,
-      0.08,
-      0xe3d9a4,
-    );
-    vein.rotation.z = 0.48;
-    const crystal = this.cylinder(
-      "moonstone-crystal",
-      0.36,
-      0.76,
-      0.17,
-      0,
-      0.12,
-      0.57,
-      0xe5eee1,
-      5,
-    );
-    crystal.rotation.z = -0.32;
-    return this.merge("split-moonstone", [a, b, vein, crystal]);
+    const [base, face] = shades[this.biome] ?? [0x708e9d, 0xc3dce1];
+    const ore = this.biome === "volcano" ? 0xffb258 :
+      this.biome === "desert" ? 0xffdb77 : this.biome === "ice" ? 0xc2f9ff : 0xc7eee5;
+    const main = this.rock("ore-boulder", 1.70, base, seed);
+    const shoulder = this.rock("ore-shoulder", 0.95, face, seed + 2);
+    shoulder.position.set(-0.46, 0.12, 0.17);
+    const parts = [main, shoulder];
+    // A cluster with broad bright crystal faces, not tiny vein decoration.
+    for (const [x, z, height, tilt] of [
+      [-0.27, -0.30, 0.64, 0.29], [0.16, -0.16, 0.91, -0.13], [0.47, 0.07, 0.55, -0.37],
+    ]) {
+      const gem = this.cylinder("ore-crystal", x, 0.78 + height * 0.20, z, 0.10, 0.19, height * 0.72, ore, 12);
+      gem.rotation.z = tilt;
+      const tip = this.cylinder("ore-crystal-tip", x - Math.sin(tilt) * height * 0.45,
+        0.78 + height * 0.64, z, 0.005, 0.10, height * 0.28, face, 12);
+      tip.rotation.z = tilt;
+      parts.push(gem, tip);
+    }
+    return this.merge("split-moonstone", parts);
   }
   berry() {
-    const parts: Mesh[] = [];
-    for (let i = 0; i < 3; i++)
-      parts.push(
-        this.sphere(
-          "berry-leaves",
-          (i - 1) * 0.28,
-          0.34 + i * 0.05,
-          i === 1 ? 0.18 : 0,
-          0.78,
-          0.68,
-          0.7,
-          [0x377e62, 0x609c61, 0x81b976][i],
-          true,
-        ),
-      );
-    for (let i = 0; i < 8; i++) {
-      const a = i * 2.399;
-      parts.push(
-        this.sphere(
-          "coral-berry",
-          Math.cos(a) * 0.34,
-          0.56 + noise(i) * 0.28,
-          Math.sin(a) * 0.33,
-          0.16,
-          0.19,
-          0.16,
-          i % 2 ? 0xf09b79 : 0xd77360,
-          true,
-        ),
-      );
+    const parts: Mesh[] = [
+      this.foliage(-0.30, 0.34, 0.02, 0.94, 0.69, 0.87, 0x286f4b, 0x69ad4e),
+      this.foliage(0.32, 0.39, 0, 0.95, 0.75, 0.87, 0x347d4b, 0x7eb74f),
+      this.foliage(0, 0.60, 0.12, 0.97, 0.72, 0.89, 0x39854b, 0x8bc858),
+    ];
+    // Four large red berries survive the small phone viewport much better
+    // than eight tiny dots. Their calyx is built into the merged bush.
+    for (const [x,y,z] of [[-0.43,0.56,-0.33],[0.40,0.62,-0.32],[0,0.91,-0.16],[0.10,0.50,0.43]]) {
+      parts.push(this.sphere("ripe-berry", x,y,z,0.34,0.37,0.34,0xe34e40));
+      parts.push(this.sphere("berry-highlight", x-0.07,y+0.09,z-0.12,0.10,0.11,0.065,0xffad80));
+      parts.push(this.sphere("berry-calyx", x,y+0.17,z,0.17,0.07,0.16,0x427c3b));
     }
     return this.merge("sunberry-bush", parts);
   }
@@ -649,177 +626,102 @@ export class Art {
   }
   enemy(type: number) {
     const p: Mesh[] = [];
-    if (type === 3) {
-      p.push(
-        this.sphere("frost-wolf", 0, 0.55, 0, 0.95, 0.75, 1.25, 0x9bbfce, true),
-      );
-      for (const x of [-0.3, 0.3]) {
-        p.push(
-          this.cylinder("wolf-ear", x, 1.02, 0.28, 0, 0.2, 0.55, 0xdde7da),
-        );
-        p.push(this.box("wolf-leg", x, 0.18, 0.3, 0.16, 0.45, 0.2, 0x6e939f));
-      }
-      p.push(
-        this.sphere("wolf-snout", 0, 0.52, 0.58, 0.4, 0.32, 0.5, 0xe8eddf),
-      );
-    } else if (type === 4 || type === 5) {
-      p.push(
-        this.sphere(
-          "guardian-shell",
-          0,
-          0.6,
-          0,
-          1.2,
-          1.1,
-          1.2,
-          type === 5 ? 0xb99862 : 0x8f8eb4,
-          true,
-        ),
-      );
-      for (const x of [-0.35, 0, 0.35])
-        p.push(
-          this.cylinder(
-            "crystal-crown",
-            x,
-            1.15,
-            0,
-            0,
-            0.2,
-            x === 0 ? 0.95 : 0.6,
-            type === 5 ? 0xffdd83 : 0xc0d9e1,
-          ),
-        );
-      for (const x of [-0.55, 0.55])
-        p.push(
-          this.box("guardian-arm", x, 0.42, 0.15, 0.3, 0.65, 0.45, 0x64868b),
-        );
-    } else if (type === 0) {
-      p.push(
-        this.sphere("mist-mote", 0, 0.46, 0, 0.85, 0.83, 0.75, 0x9d96c3, true),
-      );
-      p.push(
-        this.sphere(
-          "cheek",
-          -0.19,
-          0.62,
-          0.22,
-          0.25,
-          0.24,
-          0.15,
-          0xc8b6d9,
-          true,
-        ),
-      );
-      for (const x of [-0.17, 0.17]) {
-        const ear = this.cylinder(
-          "mist-antler",
-          x,
-          0.99,
-          0,
-          0.015,
-          0.09,
-          0.37,
-          0xc9b8d7,
-          5,
-        );
-        ear.rotation.z = x > 0 ? -0.35 : 0.35;
-        p.push(ear);
-      }
-    } else if (type === 1) {
-      p.push(
-        this.sphere("moss-shell", 0, 0.48, 0, 1.17, 0.83, 0.99, 0x74a289, true),
-      );
-      p.push(this.rock("crystal-antler", 0.4, 0xc0dc9f, 7));
-      p[p.length - 1].position.set(-0.22, 0.79, 0);
-      for (let i = 0; i < 4; i++)
-        p.push(
-          this.box(
-            "shell-ridge",
-            (i - 1.5) * 0.24,
-            0.85,
-            0,
-            0.07,
-            0.04,
-            0.57,
-            0x4c7d69,
-          ),
-        );
-      for (const x of [-0.4, 0.4])
-        for (const z of [-0.3, 0.3])
-          p.push(
-            this.sphere(
-              "shell-foot",
-              x,
-              0.13,
-              z,
-              0.28,
-              0.25,
-              0.23,
-              0xc5bc8e,
-              true,
-            ),
-          );
-    } else {
-      p.push(
-        this.sphere("dusk-body", 0, 0.48, 0, 0.39, 0.75, 0.38, 0xd9916c, true),
-      );
+    // Each creature has a different silhouette, even without its name or HP bar.
+    // All parts merge into a single source mesh shared by existing instances.
+    const ball = (name: string, x: number, y: number, z: number, w: number, h: number, d: number, tint: number) =>
+      p.push(this.sphere(name, x, y, z, w, h, d, tint));
+    const cone = (name: string, x: number, y: number, z: number, rt: number, rb: number, height: number, tint: number, tilt = 0) => {
+      const mesh = this.cylinder(name, x, y, z, rt, rb, height, tint, 12);
+      mesh.rotation.z = tilt;
+      p.push(mesh);
+    };
+    const eyes = (width: number, y: number, z: number, rim = 0xffe5ae, size = 1) => {
       for (const side of [-1, 1]) {
-        const wing = this.sphere(
-          "dusk-wing",
-          side * 0.45,
-          0.67,
-          0,
-          0.9,
-          0.19,
-          0.59,
-          side === 1 ? 0xf1b782 : 0xe0a174,
-          true,
-        );
-        wing.rotation.z = side * 0.27;
-        p.push(wing);
+        ball("eye-mask", side * width, y, z, 0.23 * size, 0.25 * size, 0.10, rim);
+        ball("eye", side * width, y, z + 0.046, 0.105 * size, 0.15 * size, 0.065, 0x273442);
+        ball("eye-glint", side * width - 0.025 * size, y + 0.047 * size, z + 0.077, 0.042 * size, 0.052 * size, 0.022, 0xfff8e6);
       }
-      p.push(this.cylinder("crest", 0, 0.91, 0, 0, 0.1, 0.3, 0xeec598, 4));
-    }
-    for (const side of [-1, 1]) {
-      const x = side * (type === 1 ? 0.2 : 0.14),
-        z = type === 1 ? 0.45 : type === 2 ? 0.22 : 0.34;
-      p.push(
-        this.sphere("enemy-eye-rim", x, 0.59, z, 0.2, 0.23, 0.06, 0xffe9b6),
-      );
-      p.push(
-        this.sphere(
-          "enemy-eye",
-          x,
-          0.59,
-          z + 0.045,
-          0.085,
-          0.14,
-          0.035,
-          0x293e4c,
-        ),
-      );
-      p.push(
-        this.sphere(
-          "eye-shine",
-          x - 0.015,
-          0.625,
-          z + 0.064,
-          0.027,
-          0.034,
-          0.014,
-          0xfff9e4,
-        ),
-      );
+    };
+    if (type === 0) {
+      // Violet sprout slime: broad jelly body, tiny feet, curled antenna.
+      ball("jelly-body", 0, 0.47, 0, 1.04, 0.94, 0.86, 0x9372bd);
+      ball("jelly-belly", 0, 0.36, 0.34, 0.64, 0.49, 0.19, 0xd7b4e1);
+      for (const side of [-1,1]) {
+        ball("jelly-foot", side * 0.29, 0.12, 0.13, 0.36, 0.25, 0.37, 0x684d98);
+        cone("sprout-stalk", side * 0.20, 0.97, -0.02, 0.045, 0.09, 0.36, 0x7353a3, -side * 0.47);
+        ball("sprout-tip", side * 0.29, 1.11, -0.02, 0.20, 0.20, 0.20, 0xf3ba78);
+      }
+      eyes(0.18, 0.61, 0.385, 0xe2bce9);
+    } else if (type === 1) {
+      // Armored beetle: a wide segmented shell, dark head and visible feet.
+      ball("beetle-belly", 0, 0.37, 0, 1.22, 0.55, 1.14, 0x375d4c);
+      ball("beetle-shell", 0, 0.62, -0.12, 1.38, 0.89, 1.18, 0x56984a);
+      ball("beetle-shell-highlight", 0, 0.87, -0.17, 1.04, 0.41, 0.83, 0x9dc65d);
+      p.push(this.box("shell-seam", 0, 0.99, -0.13, 0.075, 0.08, 0.74, 0x3e7046));
+      ball("beetle-head", 0, 0.46, 0.53, 0.78, 0.62, 0.55, 0x416b4d);
+      for (const side of [-1,1]) {
+        for (const z of [-0.36, 0.34])
+          ball("beetle-foot", side * 0.57, 0.16, z, 0.35, 0.29, 0.32, 0x6e6844);
+        cone("beetle-horn", side * 0.23, 0.84, 0.56, 0.015, 0.13, 0.40, 0xf2ce87, -side * 0.23);
+      }
+      eyes(0.19, 0.52, 0.75, 0xffe3a0, 0.92);
+    } else if (type === 2) {
+      // Orange flying bird: spread wings, cream belly, beak and tail.
+      ball("bird-body", 0, 0.48, 0, 0.66, 0.71, 0.70, 0xd66e36);
+      ball("bird-belly", 0, 0.42, 0.27, 0.48, 0.48, 0.24, 0xffdfa4);
+      ball("bird-head", 0, 0.80, 0.18, 0.61, 0.59, 0.58, 0xf0a047);
+      for (const side of [-1,1]) {
+        const wing = this.sphere("bird-wing", side * 0.56, 0.65, -0.06, 1.04, 0.26, 0.60, 0xc75d39);
+        wing.rotation.z = side * 0.24;
+        p.push(wing);
+        const feather = this.sphere("wing-feathers", side * 0.69, 0.70, -0.07, 0.75, 0.21, 0.44, 0xffbb5f);
+        feather.rotation.z = side * 0.24;
+        p.push(feather);
+        ball("bird-foot", side * 0.14, 0.11, 0.16, 0.17, 0.18, 0.27, 0xc27c3c);
+      }
+      const tail = this.sphere("bird-tail", 0, 0.52, -0.52, 0.31, 0.18, 0.64, 0xb85a37);
+      tail.rotation.x = 0.40;
+      p.push(tail);
+      ball("bird-beak", 0, 0.72, 0.53, 0.23, 0.17, 0.33, 0xffcf59);
+      eyes(0.16, 0.84, 0.42, 0xffe6a7, 0.83);
+    } else if (type === 3) {
+      // Blue wolf: four paws, separate head, pointed ears and bushy tail.
+      ball("wolf-body", 0, 0.56, -0.13, 0.77, 0.70, 1.31, 0x628cae);
+      ball("wolf-chest", 0, 0.54, 0.36, 0.67, 0.70, 0.54, 0xc0e3ea);
+      for (const side of [-1,1]) {
+        for (const z of [-0.49,0.37]) {
+          ball("wolf-leg", side * 0.28, 0.26, z, 0.25, 0.48, 0.27, 0x537c9f);
+          ball("wolf-paw", side * 0.28, 0.09, z + 0.065, 0.30, 0.18, 0.33, 0xd7eced);
+        }
+        cone("wolf-ear", side * 0.26, 1.16, 0.46, 0.015, 0.19, 0.48, 0x648fb2, -side * 0.12);
+      }
+      ball("wolf-head", 0, 0.84, 0.49, 0.84, 0.68, 0.67, 0x83b5ce);
+      ball("wolf-muzzle", 0, 0.68, 0.83, 0.47, 0.33, 0.51, 0xe5f3ec);
+      ball("wolf-nose", 0, 0.76, 1.04, 0.21, 0.15, 0.16, 0x304859);
+      const tail = this.sphere("wolf-tail", 0, 0.73, -0.84, 0.38, 0.38, 0.86, 0x8bbbd3);
+      tail.rotation.x = 0.42; p.push(tail);
+      eyes(0.23, 0.91, 0.78, 0xdaf2ed, 0.78);
+    } else {
+      // Crystal golem and guardian share a strong torso silhouette, but their
+      // purple/blue versus gold/bronze armor and crown separate their roles.
+      const boss = type === 5, shell = boss ? 0xb08042 : 0x756ba7;
+      const plate = boss ? 0xf0bb58 : 0xa8b3db;
+      const crystal = boss ? 0xffe49a : 0x85e2ec;
+      ball("golem-torso", 0, 0.67, 0, 1.18, 1.13, 0.95, shell);
+      ball("golem-face", 0, 0.82, 0.40, 0.82, 0.65, 0.31, boss ? 0x79563a : 0x4b526e);
+      for (const side of [-1,1]) {
+        ball("golem-shoulder", side * 0.57, 0.75, 0.01, 0.55, 0.61, 0.56, plate);
+        ball("golem-fist", side * 0.70, 0.34, 0.20, 0.46, 0.52, 0.53, shell);
+        ball("golem-foot", side * 0.30, 0.15, 0.15, 0.48, 0.30, 0.51, plate);
+        cone("golem-side-crystal", side * 0.38, 1.22, -0.13, 0.02, 0.19, 0.62, crystal, -side * 0.24);
+      }
+      cone("golem-center-crystal", 0, 1.42, -0.12, 0.015, 0.25, 0.92, crystal);
+      const emblem = this.box("golem-core", 0, 0.36, 0.48, 0.30, 0.30, 0.13, crystal);
+      emblem.rotation.z = Math.PI / 4; p.push(emblem);
+      eyes(0.20, 0.90, 0.56, boss ? 0xffdf86 : 0xcaf9ee, 0.91);
     }
     return this.merge(
-      [
-        "mist-mote",
-        "moss-helmet",
-        "dusk-flier",
-        "frost-wolf",
-        "crystalback",
-        "guardian",
-      ][type],
+      ["mist-mote", "moss-helmet", "dusk-flier", "frost-wolf", "crystalback", "guardian"][type],
       p,
     );
   }
