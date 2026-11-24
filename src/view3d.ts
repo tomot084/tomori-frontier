@@ -324,17 +324,7 @@ export class WorldView {
         baseY: 0,
       });
       if (n.kind === "wood") {
-        const stump = this.art.cylinder(
-          "tree-stump",
-          0,
-          0.09,
-          0,
-          0.19,
-          0.25,
-          0.18,
-          0xbc955f,
-          8,
-        );
+        const stump = this.art.stump(n.x + n.y);
         stump.position.addInPlace(root.position);
         stump.freezeWorldMatrix();
       }

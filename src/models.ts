@@ -326,32 +326,118 @@ export class Art {
     if (!harvestable) mesh.scaling.setAll(0.9 + noise(seed + zone) * 0.12);
     return mesh;
   }
+  /**
+   * Sculpt a continuous broadleaf canopy, not a collection of round balls.
+   * Low-frequency crown lobes, smaller leaf scallops and a warm top gradient
+   * are built into a single smooth mesh. The silhouette remains readable
+   * even at the overhead camera angle.
+   */
+  private oakCrown(seed: number, lower: number, middle: number, upper: number) {
+    const crown = MeshBuilder.CreateSphere("oak-leaf-canopy", { diameter: 2, segments: 18 }, this.scene);
+    const points = crown.getVerticesData(VertexBuffer.PositionKind)!;
+    const phase = noise(seed + 17) * Math.PI * 2;
+    const lo = color(lower), mid = color(middle), hi = color(upper);
+    const shades: number[] = [];
+    for (let i = 0; i < points.length; i += 3) {
+      const x = points[i], y = points[i + 1], z = points[i + 2];
+      const a = Math.atan2(z, x), r = Math.hypot(x, z);
+      // Smoothly blend near the poles: no seams, holes or detached spheres.
+      const broad = Math.sin(a * 3 + phase + y * 1.5) * 0.105
+        + Math.cos(a * 5 - phase + y * 2.3) * 0.055;
+      const scallop = Math.sin(a * 11 + y * 8) * Math.cos(y * 9 - a * 3) * 0.033;
+      const radius = 1 + r * (broad + scallop) + y * 0.065;
+      points[i] = x * radius * 1.12 + (y + 1) * 0.065;
+      points[i + 1] = y * 0.88 + 0.045 * r * Math.sin(a * 4 + phase);
+      points[i + 2] = z * radius * 1.02;
+      const t = Math.max(0, Math.min(1, (y + 0.83) / 1.7
+        + r * 0.10 * Math.sin(a * 5 + y * 5 + phase)));
+      const aColor = t < 0.5 ? lo : mid, bColor = t < 0.5 ? mid : hi;
+      const mix = t < 0.5 ? t * 2 : (t - 0.5) * 2;
+      shades.push(aColor.r + (bColor.r - aColor.r) * mix,
+        aColor.g + (bColor.g - aColor.g) * mix,
+        aColor.b + (bColor.b - aColor.b) * mix, 1);
+    }
+    crown.setVerticesData(VertexBuffer.PositionKind, points);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(points, crown.getIndices()!, normals);
+    crown.setVerticesData(VertexBuffer.NormalKind, normals);
+    this.tint(crown, middle);
+    crown.setVerticesData(VertexBuffer.ColorKind, shades);
+    crown.position.y = 2.52;
+    crown.refreshBoundingInfo();
+    return crown;
+  }
+  /** One bent, tapered wooden trunk with continuous roots and bark grooves. */
+  private oakTrunk(seed: number, bark: number, lightBark: number, darkBark: number) {
+    const trunk = MeshBuilder.CreateCylinder("oak-bent-trunk", {
+      diameterTop: 0.40, diameterBottom: 0.76, height: 2.22,
+      tessellation: 16, subdivisions: 6,
+    }, this.scene);
+    const p = trunk.getVerticesData(VertexBuffer.PositionKind)!;
+    const lean = (noise(seed + 4) - 0.5) * 0.28;
+    for (let i = 0; i < p.length; i += 3) {
+      const t = Math.max(0, Math.min(1, (p[i + 1] + 1.11) / 2.22));
+      const a = Math.atan2(p[i + 2], p[i]);
+      const flare = 1 + Math.pow(1 - t, 7) * (0.25 + 0.15 * Math.cos(a * 5));
+      const ridges = 1 + 0.065 * Math.sin(a * 7 + t * 3);
+      p[i] = p[i] * flare * ridges + lean * t * t;
+      p[i + 2] *= flare * ridges;
+    }
+    trunk.setVerticesData(VertexBuffer.PositionKind, p);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(p, trunk.getIndices()!, normals);
+    trunk.setVerticesData(VertexBuffer.NormalKind, normals);
+    this.tint(trunk, bark);
+    this.paintItem(trunk, (x, y, z) => {
+      const groove = Math.cos(Math.atan2(z, x) * 7 + y * 1.3);
+      return groove > 0.58 ? lightBark : groove < -0.66 ? darkBark : bark;
+    });
+    trunk.position.y = 1.11;
+    trunk.refreshBoundingInfo();
+    return trunk;
+  }
+  stump(seed: number) {
+    // A visibly cut, low stump remains on the ground after felling.
+    const bark = this.cylinder("stump-bark", 0, 0.16, 0, 0.32, 0.43, 0.32, 0x805135, 16);
+    this.paintItem(bark, (x, _y, z) =>
+      Math.cos(Math.atan2(z, x) * 6 + seed) > 0.4 ? 0xa76d43 : 0x75482f);
+    const parts = [bark];
+    for (const [radius, height, tint] of [
+      [0.29, 0.325, 0xf9d69a],
+      [0.21, 0.340, 0xc18a4a],
+      [0.165, 0.352, 0xf8d99f],
+      [0.086, 0.364, 0xd29a55],
+      [0.046, 0.376, 0xffdfa8],
+    ]) parts.push(this.cylinder("stump-end-grain", 0, height, 0, radius, radius, 0.018, tint, 16));
+    return this.merge("tree-stump", parts);
+  }
   tree(seed: number, zone = 0, harvestable = true) {
     if (["forest", "snow", "ice", "volcano", "desert", "park"].includes(this.biome))
       return this.themedTree(seed, zone, harvestable);
-    // A broad-rooted trunk and distinct crown lobes form a recognizable oak.
-    const bark = harvestable ? 0x945c36 : 0xa19880;
-    const parts: Mesh[] = [
-      this.cylinder("grove-trunk", 0, 0.80, 0, 0.24, 0.42, 1.60, bark, 12),
-      this.cylinder("root-flare", 0, 0.15, 0, 0.39, 0.53, 0.30, bark, 12),
-    ];
+    // Visible branch fork, tapering bark and a single sculpted leaf canopy.
+    const bark = harvestable ? 0x90552f : 0x8d8068;
+    const lightBark = harvestable ? 0xb47743 : 0xada089;
+    const darkBark = harvestable ? 0x6a412a : 0x766c59;
+    const parts: Mesh[] = [this.oakTrunk(seed, bark, lightBark, darkBark)];
     for (const side of [-1, 1]) {
-      const branch = this.cylinder("oak-branch", side * 0.39, 1.37, 0, 0.12, 0.20, 1.08, bark, 12);
-      branch.rotation.z = -side * 0.64;
+      const branch = this.cylinder("oak-fork", side * 0.30, 1.53, 0, 0.10, 0.19, 1.0, bark, 12);
+      branch.rotation.z = -side * 0.69;
       parts.push(branch);
     }
-    const low = harvestable ? 0x267648 : 0x71907b;
-    const mid = harvestable ? 0x49a34c : 0x8da88a;
-    const high = harvestable ? 0x8bcc58 : 0xa8bb94;
-    parts.push(
-      this.foliage(-0.68, 1.99, 0.06, 1.68, 1.50, 1.56, low, mid),
-      this.foliage(0.68, 2.05, -0.08, 1.66, 1.60, 1.60, low, mid),
-      this.foliage(0, 2.52, 0.04, 1.98, 1.70, 1.76, mid, high),
-      this.foliage(-0.16, 2.12, -0.55, 1.52, 1.30, 1.22, mid, high),
-    );
+    for (let k = 0; k < 4; k++) {
+      const a = k * Math.PI / 2 + 0.55;
+      const root = this.sphere("oak-root", Math.sin(a) * 0.33, 0.085, Math.cos(a) * 0.33,
+        0.21, 0.21, 0.52, bark);
+      root.rotation.y = a;
+      parts.push(root);
+    }
+    const low = harvestable ? 0x286b36 : 0x67866b;
+    const mid = harvestable ? 0x42923c : 0x8fa581;
+    const high = harvestable ? 0x95c94a : 0xb5c59a;
+    parts.push(this.oakCrown(seed, low, mid, high));
     if (harvestable) {
-      const notch = this.box("fresh-trunk-notch", 0, 0.55, -0.37, 0.36, 0.17, 0.11, palette.cut);
-      notch.rotation.z = 0.17;
+      const notch = this.box("fresh-trunk-notch", 0, 0.62, -0.34, 0.32, 0.14, 0.10, palette.cut);
+      notch.rotation.z = 0.14;
       parts.push(notch);
     }
     const tree = this.merge(
