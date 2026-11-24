@@ -229,41 +229,62 @@ export class InvestmentView {
         emblem.position.set(0, 2.24, -0.37);
         parts.push(emblem);
       } else if (tile.id === "sawmill") {
-        // Broad, recognizable machine: dark frame, gold safety arch, visible
-        // circular saw, orange raw intake and pale processed-wood outfeed.
+        // Enclosed cast-metal chassis with a recessed cutting bed.
+        // All static fittings are merged by the existing investment renderer.
+        const steel = 0x3d6e77, dark = 0x274653, gold = 0xf0b94f;
         parts.push(
-          art.box("machine-bed", 0, 0.83, 0, 3.8, 0.36, 1.55, palette.ink),
-          art.box("machine-base", 0, 0.18, 0.16, 2.7, 0.36, 1.48, 0x35696b),
+          art.box("cast-base", 0, 0.23, 0.05, 3.65, 0.46, 1.50, dark),
+          art.box("cast-body", 0, 0.59, 0.10, 3.20, 0.66, 1.34, steel),
+          art.box("steel-table", 0, 0.91, 0, 3.85, 0.21, 1.56, 0x91a8a9),
+          art.box("blade-slot", 0, 1.025, -0.15, 1.90, 0.024, 0.29, 0x263e49),
+          art.box("service-panel", 0, 0.53, -0.61, 2.72, 0.46, 0.09, 0x57858a),
         );
-        for (const x of [-1.35, 1.35])
-          for (const z of [-0.48, 0.48])
-            parts.push(
-              art.box("machine-foot", x, 0.43, z, 0.42, 0.86, 0.42, 0x35696b),
-            );
-        for (const z of [-0.68, 0.68]) {
+        for (const x of [-1.43, 1.43])
+          for (const z of [-0.54, 0.54]) {
+            parts.push(art.box("rubber-foot", x, 0.09, z, 0.56, 0.18, 0.48, 0x273c46));
+            parts.push(art.cylinder("foot-bolt", x, 0.205, z, 0.09, 0.09, 0.08, 0xa7c0be, 8));
+          }
+        for (const x of [-1.65, -1.27, -0.90, 0.90, 1.27, 1.65]) {
+          const roller = art.cylinder("feed-roller", x, 1.055, 0, 0.095, 0.095, 1.12, 0x687e87, 12);
+          roller.rotation.x = Math.PI / 2;
+          parts.push(roller);
+        }
+        for (const z of [-0.69, 0.69]) {
           parts.push(
-            art.box("feed-funnel", 1.18, 1.16, z, 1.36, 0.5, 0.24, 0xcc8c43),
-            art.box("output-guide", -1.18, 1.05, z * 0.74, 1.3, 0.16, 0.14, 0xffd99a),
+            art.box("intake-guide", 1.28, 1.18, z, 1.10, 0.33, 0.19, 0xc7893f),
+            art.box("outfeed-guide", -1.28, 1.13, z, 1.12, 0.19, 0.15, 0x4b9e9c),
           );
         }
-        for (const x of [-0.72, 0.72])
-          parts.push(
-            art.box("saw-guard-post", x, 1.64, 0.51, 0.34, 1.52, 0.38, 0xdfa646),
-          );
+        // A curved motor housing and a sturdy guard frame, instead of a
+        // stack of indistinguishable rectangular blocks.
+        for (const x of [-0.74, 0.74])
+          parts.push(art.box("guard-upright", x, 1.68, 0.56, 0.30, 1.32, 0.38, gold));
+        const guard = art.cylinder("guard-rounded-beam", 0, 2.30, 0.56, 0.26, 0.26, 1.80, gold, 16);
+        guard.rotation.z = Math.PI / 2;
+        parts.push(guard);
+        const motor = art.cylinder("sawmill-motor", 0.08, 1.39, 0.59, 0.43, 0.43, 0.94, 0x286d79, 16);
+        motor.rotation.z = Math.PI / 2;
+        parts.push(motor);
+        for (const x of [-0.33, -0.17, -0.01, 0.15, 0.31]) {
+          const rib = art.cylinder("motor-cooling-fin", x, 1.39, 0.59, 0.46, 0.46, 0.055, 0x448d96, 16);
+          rib.rotation.z = Math.PI / 2;
+          parts.push(rib);
+        }
+        const motorCap = art.cylinder("motor-cap", 0.57, 1.39, 0.59, 0.28, 0.32, 0.14, dark, 16);
+        motorCap.rotation.z = Math.PI / 2;
+        parts.push(motorCap);
         parts.push(
-          art.box("saw-guard-arch", 0, 2.42, 0.48, 1.9, 0.34, 0.65, 0xf3c260),
-          art.box("guard-light", 0, 2.43, 0.10, 0.60, 0.15, 0.08, 0xffefad),
-          art.box("motor-housing", 0.15, 1.4, 0.60, 0.98, 1.05, 0.65, palette.teal),
-          art.box("motor-face", 0.15, 1.40, 0.24, 0.70, 0.64, 0.10, 0x326c72),
+          art.box("control-pedestal", 1.60, 1.31, -0.70, 0.23, 0.80, 0.25, dark),
+          art.box("control-console", 1.60, 1.73, -0.70, 0.56, 0.20, 0.48, steel),
+          art.cylinder("start-button", 1.47, 1.86, -0.70, 0.10, 0.11, 0.07, 0x91db83, 12),
+          art.cylinder("stop-button", 1.72, 1.86, -0.70, 0.10, 0.11, 0.07, 0xd75e48, 12),
         );
-        for (let i = 0; i < 3; i++)
-          parts.push(
-            art.box("motor-vent", -0.09 + i * 0.24, 1.40, 0.17, 0.10, 0.39, 0.04, palette.ink),
-          );
-        parts.push(
-          art.box("amber-switch", 0.70, 1.26, -0.60, 0.28, 0.28, 0.14, 0xffc35e),
-        );
-        // No decorative timber or boards: live production meshes supply them.
+        for (let k = 0; k < 5; k++) {
+          const stripe = art.box("safety-mark", -0.40 + k * 0.20, 0.83, -0.705, 0.10, 0.21, 0.025, gold);
+          stripe.rotation.z = -0.30;
+          parts.push(stripe);
+        }
+        // Real stock and workpieces remain separate live geometry.
       } else if (tile.id === "quarry") {
         for (let i = 0; i < 3; i++) {
           const rock = art.rock("cut-stone", 0.62, palette.stoneLight, i);

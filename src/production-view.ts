@@ -179,7 +179,17 @@ export class ProductionView {
       }
     }
     this.conveyor = new TransformNode("purchased-conveyor", art.scene);
-    const belt = art.box("charcoal-belt", 0, 0.72, 0, 4.8, 0.3, 1.85, 0x304951);
+    const belt = art.merge("charcoal-belt", [
+      art.box("rubber-belt", 0, 0.72, 0, 4.8, 0.30, 1.85, 0x293f48),
+      art.box("belt-lower-return", 0, 0.36, 0, 4.58, 0.18, 1.60, 0x344c56),
+      art.box("belt-steel-frame", 0, 0.51, -0.94, 4.65, 0.28, 0.19, 0x6e9299),
+      art.box("belt-steel-frame", 0, 0.51, 0.94, 4.65, 0.28, 0.19, 0x6e9299),
+      ...[-1.55, 0, 1.55].flatMap(x =>
+        [-0.72, 0.72].flatMap(z => [
+          art.box("belt-support-leg", x, 0.05, z, 0.22, 0.70, 0.24, 0x466975),
+          art.box("belt-support-foot", x, -0.31, z, 0.45, 0.13, 0.38, 0x344851),
+        ])),
+    ]);
     belt.parent = this.conveyor;
     const slatSource = art.box(
       "belt-slat-source",
@@ -200,8 +210,11 @@ export class ProductionView {
       this.slats.push(m);
     }
     for (const z of [-1, 1]) {
-      const m = art.box("belt-rail", 0, 0.9, z, 4.95, 0.20, 0.19, 0xe6a94b);
-      m.parent = this.conveyor;
+      const rails = [art.box("belt-rail", 0, 0.9, z, 4.95, 0.20, 0.19, 0xe6a94b)];
+      for (const x of [-2.0,-1.0,0,1.0,2.0])
+        rails.push(art.cylinder("rail-bolt", x, 1.012, z, 0.065, 0.065, 0.045, 0x526e79, 8));
+      const rail = art.merge("belt-side-rail", rails);
+      rail.parent = this.conveyor;
     }
     // Wide roller chassis and repeated left-pointing chevrons make the feed readable at phone scale.
     for (const x of [-2.3, 2.3]) {
@@ -276,22 +289,30 @@ export class ProductionView {
     this.fastMotor = fast;
     this.conveyor.position.copyFrom(worldPoint(sawPoint.x, inputPoint.y, 0.4));
     this.conveyor.setEnabled(false);
-    // Bake the hub and teeth into a single mesh so the whole blade rotates
-    // together, with no per-tooth meshes to render or update.
+    // A single custom gear-shaped steel blade: sharply defined teeth, a
+    // darker recessed hub, and silver face. No rotating individual meshes.
     const bladeParts = [
-      art.cylinder("saw-disc", 0, 0, 0, 0.88, 0.88, 0.13, 0x91b5c2, 24),
-      art.cylinder("saw-face", 0, 0.074, 0, 0.76, 0.76, 0.018, 0xc9e1e3, 24),
-      art.cylinder("saw-rear", 0, -0.074, 0, 0.76, 0.76, 0.018, 0xc9e1e3, 24),
-      art.cylinder("saw-hub", 0, 0, 0, 0.24, 0.24, 0.23, 0x496b79, 12),
+      art.cylinder("saw-disc", 0, 0, 0, 0.78, 0.78, 0.105, 0x839eaa, 32),
+      art.cylinder("saw-face", 0, 0.060, 0, 0.70, 0.70, 0.018, 0xd1e6e7, 32),
+      art.cylinder("saw-rear", 0, -0.060, 0, 0.70, 0.70, 0.018, 0xd1e6e7, 32),
+      art.cylinder("saw-hub", 0, 0, 0, 0.27, 0.27, 0.17, 0x557482, 16),
+      art.cylinder("saw-axle", 0, 0, 0, 0.115, 0.115, 0.22, 0x334c59, 12),
     ];
-    for (let k = 0; k < 12; k++) {
-      const angle = (k * Math.PI * 2) / 12;
-      const tooth = art.box(
-        "saw-tooth", Math.sin(angle) * 0.89, 0, Math.cos(angle) * 0.89,
-        0.19, 0.17, 0.22, 0xe4f0e8,
-      );
-      tooth.rotation.y = angle + 0.25;
-      bladeParts.push(tooth);
+    for (let k = 0; k < 16; k++) {
+      const angle = k * Math.PI * 2 / 16;
+      const tooth = art.cylinder("saw-raked-tooth", Math.sin(angle) * 0.81, 0, Math.cos(angle) * 0.81,
+        0.16, 0.16, 0.11, 0xe2edeb, 3);
+      // Art.cylinder uses at least 12 sides. The angled narrow metal insert
+      // below gives the tooth an identifiable cutting edge.
+      const edge = art.box("saw-cutting-edge", Math.sin(angle + 0.04) * 0.87, 0,
+        Math.cos(angle + 0.04) * 0.87, 0.11, 0.14, 0.20, 0xf4f6e9);
+      edge.rotation.y = angle + 0.38;
+      bladeParts.push(tooth, edge);
+    }
+    for (let k = 0; k < 5; k++) {
+      const a = k * Math.PI * 2 / 5;
+      bladeParts.push(art.cylinder("saw-hub-bolt", Math.sin(a) * 0.19, 0.095, Math.cos(a) * 0.19,
+        0.055, 0.055, 0.04, 0xadc2c9, 8));
     }
     this.saw = art.merge("working-saw", bladeParts);
     this.saw.rotation.x = Math.PI / 2;
@@ -445,7 +466,7 @@ export class ProductionView {
       ),
     );
     if (working) this.saw.rotate(Vector3.Up(), dt * 12, 0);
-    this.saw.scaling.setAll(working ? 1 + Math.sin(time * 28) * 0.05 : 1);
+    // Steel blades rotate but do not pulse in size.
     for (const f of this.flights) {
       if (f.age >= f.life) {
         f.mesh.setEnabled(false);

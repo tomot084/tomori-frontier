@@ -208,24 +208,41 @@ export class Art {
     return mesh;
   }
   log(name: string) {
-    // Warm bark and cream end grain read differently from flat, honey-colored boards.
-    const body = this.cylinder(name, 0, 0, 0, 0.16, 0.18, 0.8, 0x98572e, 12);
-    this.paintItem(body, (x, _y, z) => {
-      const band = Math.cos(Math.atan2(z, x) * 3);
-      return band > 0.45 ? 0xb9753f : band < -0.45 ? 0x754023 : 0x98572e;
+    // An irregular cylindrical cross-section, longitudinal bark grooves
+    // and cut grain. Same nominal dimensions as the original shared source.
+    const body = MeshBuilder.CreateCylinder(name, {
+      diameterTop: 0.32, diameterBottom: 0.36, height: 0.8,
+      tessellation: 20, subdivisions: 4,
+    }, this.scene);
+    const p = body.getVerticesData(VertexBuffer.PositionKind)!;
+    for (let i = 0; i < p.length; i += 3) {
+      const a = Math.atan2(p[i + 2], p[i]), y = p[i + 1];
+      const r = 1 + 0.070 * Math.cos(a * 5 + y * 2)
+        + 0.045 * Math.sin(a * 9 - y * 3);
+      p[i] *= r;
+      p[i + 2] *= r;
+    }
+    body.setVerticesData(VertexBuffer.PositionKind, p);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(p, body.getIndices()!, normals);
+    body.setVerticesData(VertexBuffer.NormalKind, normals);
+    this.tint(body, 0x94552e);
+    this.paintItem(body, (x, y, z, _nx, ny) => {
+      if (Math.abs(ny) > 0.8) return 0xe9b774;
+      const a = Math.atan2(z, x);
+      const stripe = Math.cos(a * 7 + Math.sin(y * 4) * 0.4);
+      return stripe > 0.48 ? 0xbb7944 : stripe < -0.45 ? 0x704027 : 0x92532d;
     });
     body.rotation.z = Math.PI / 2;
     const parts = [body];
     for (const sign of [-1, 1]) {
-      // End grain on both ends, not just the side that faced the original camera.
-      for (const [offset, radius, thickness, tint] of [
-        [0.404, 0.148, 0.014, 0xffdf9e],
-        [0.414, 0.096, 0.008, 0xc28a48],
-        [0.420, 0.060, 0.006, 0xffe6af],
+      for (const [offset, radius, tint] of [
+        [0.403, 0.153, 0xe9b777], [0.409, 0.126, 0xb78148],
+        [0.415, 0.109, 0xffdfa2], [0.421, 0.080, 0xc78c4e],
+        [0.427, 0.065, 0xf8d89a], [0.433, 0.034, 0xb97b42],
+        [0.439, 0.019, 0xf4ca89],
       ]) {
-        const disc = this.cylinder(
-          name + "-end-grain", sign * offset, 0, 0, radius, radius, thickness, tint, 12,
-        );
+        const disc = this.cylinder(name + "-grain", sign * offset, 0, 0, radius, radius, 0.009, tint, 20);
         disc.rotation.z = Math.PI / 2;
         parts.push(disc);
       }
@@ -233,14 +250,25 @@ export class Art {
     return this.merge(name, parts);
   }
   plank(name: string, w = 1.1, h = 0.16, d = 0.36) {
-    const mesh = this.box(name, 0, 0, 0, w, h, d, 0xf3ca82);
-    // Preserve the existing geometry budget: contrast the broad top, long edge
-    // and cut ends with vertex color rather than extra meshes or textures.
-    return this.paintItem(mesh, (_x, _y, z, nx, ny) =>
+    const board = this.box(name, 0, 0, 0, w, h, d, 0xf3ca82);
+    this.paintItem(board, (_x, _y, z, nx, ny) =>
       ny > 0.65 ? (Math.abs(z) < d * 0.42 ? 0xffdf9c : 0xf4c47b)
         : ny < -0.65 ? 0xb78143
         : Math.abs(nx) > 0.65 ? 0xe2ab62 : 0xc48a4b,
     );
+    // Broad wood-grain stripes, merged into the shared board source.
+    const parts = [board];
+    for (const [z, length, offset, tint] of [
+      [-0.24, 0.75, -0.055, 0xdca660],
+      [0.03, 0.83, 0.015, 0xf0c17d],
+      [0.26, 0.57, 0.09, 0xd9a15a],
+    ]) {
+      const grain = this.box("plank-grain", w * offset, h / 2 + 0.0015, d * z,
+        w * length, 0.003, d * 0.055, tint);
+      grain.rotation.y = 0.014;
+      parts.push(grain);
+    }
+    return this.merge(name, parts);
   }
   brick(name: string, w = 0.55, h = 0.26, d = 0.35) {
     const mesh = this.box(name, 0, 0, 0, w, h, d, 0xbd593e);
