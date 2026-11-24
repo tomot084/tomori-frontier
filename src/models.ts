@@ -189,49 +189,72 @@ export class Art {
     m.setVerticesData(VertexBuffer.NormalKind, normals);
     return this.tint(m, hex);
   }
+  /** Shared, inexpensive vertex-painted item meshes. All parts are merged before instancing. */
+  private paintItem(
+    mesh: Mesh,
+    shade: (x: number, y: number, z: number, nx: number, ny: number, nz: number) => number,
+  ) {
+    const positions = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+    const normals = mesh.getVerticesData(VertexBuffer.NormalKind)!;
+    const colors: number[] = [];
+    for (let i = 0; i < positions.length; i += 3) {
+      const c = color(shade(
+        positions[i], positions[i + 1], positions[i + 2],
+        normals[i], normals[i + 1], normals[i + 2],
+      ));
+      colors.push(c.r, c.g, c.b, 1);
+    }
+    mesh.setVerticesData(VertexBuffer.ColorKind, colors);
+    return mesh;
+  }
   log(name: string) {
-    const body = this.cylinder(name, 0, 0, 0, 0.16, 0.18, 0.8, palette.wood, 8);
-    body.rotation.z = Math.PI / 2;
-    const ends = [-0.408, 0.408].map((x, i) => {
-      const m = this.cylinder(
-        name + "-cut" + i,
-        x,
-        0,
-        0,
-        0.151,
-        0.151,
-        0.013,
-        palette.cut,
-        8,
-      );
-      m.rotation.z = Math.PI / 2;
-      return m;
+    // Warm bark and cream end grain read differently from flat, honey-colored boards.
+    const body = this.cylinder(name, 0, 0, 0, 0.16, 0.18, 0.8, 0x98572e, 12);
+    this.paintItem(body, (x, _y, z) => {
+      const band = Math.cos(Math.atan2(z, x) * 3);
+      return band > 0.45 ? 0xb9753f : band < -0.45 ? 0x754023 : 0x98572e;
     });
-    const ring = this.cylinder(
-      "growth-ring",
-      0.42,
-      0,
-      0,
-      0.061,
-      0.061,
-      0.008,
-      0xb28651,
-      8,
+    body.rotation.z = Math.PI / 2;
+    const parts = [body];
+    for (const sign of [-1, 1]) {
+      // End grain on both ends, not just the side that faced the original camera.
+      for (const [offset, radius, thickness, tint] of [
+        [0.404, 0.148, 0.014, 0xffdf9e],
+        [0.414, 0.096, 0.008, 0xc28a48],
+        [0.420, 0.060, 0.006, 0xffe6af],
+      ]) {
+        const disc = this.cylinder(
+          name + "-end-grain", sign * offset, 0, 0, radius, radius, thickness, tint, 12,
+        );
+        disc.rotation.z = Math.PI / 2;
+        parts.push(disc);
+      }
+    }
+    return this.merge(name, parts);
+  }
+  plank(name: string, w = 1.1, h = 0.16, d = 0.36) {
+    const mesh = this.box(name, 0, 0, 0, w, h, d, 0xf3ca82);
+    // Preserve the existing geometry budget: contrast the broad top, long edge
+    // and cut ends with vertex color rather than extra meshes or textures.
+    return this.paintItem(mesh, (_x, _y, z, nx, ny) =>
+      ny > 0.65 ? (Math.abs(z) < d * 0.42 ? 0xffdf9c : 0xf4c47b)
+        : ny < -0.65 ? 0xb78143
+        : Math.abs(nx) > 0.65 ? 0xe2ab62 : 0xc48a4b,
     );
-    ring.rotation.z = Math.PI / 2;
-    const core = this.cylinder(
-      "heartwood",
-      0.426,
-      0,
-      0,
-      0.041,
-      0.041,
-      0.008,
-      palette.cut,
-      8,
+  }
+  brick(name: string, w = 0.55, h = 0.26, d = 0.35) {
+    const mesh = this.box(name, 0, 0, 0, w, h, d, 0xbd593e);
+    return this.paintItem(mesh, (_x, _y, _z, nx, ny) =>
+      ny > 0.65 ? 0xf09b6a : ny < -0.65 ? 0x964a35
+        : Math.abs(nx) > 0.65 ? 0xd77b55 : 0xb95e42,
     );
-    core.rotation.z = Math.PI / 2;
-    return this.merge(name, [body, ...ends, ring, core]);
+  }
+  stonePiece(name: string, size = 0.32) {
+    const mesh = this.rock(name, size, 0x739eae);
+    return this.paintItem(mesh, (_x, y, _z, nx, ny, nz) =>
+      ny > 0.4 || y > size * 0.65 ? 0xc3e3e8
+        : nx + nz > 0.35 ? 0x82b6c4 : 0x537d95,
+    );
   }
   tree(seed: number, zone = 0, harvestable = true) {
     // One family of broad, rounded crowns for both harvest and scenery trees.
@@ -370,36 +393,32 @@ export class Art {
   }
   resource(kind: string, name = "resource") {
     if (kind === "wood") return this.log(name);
-    if (kind === "stone") return this.rock(name, 0.32, palette.stoneLight);
+    if (kind === "stone") return this.stonePiece(name);
+    if (kind === "plank") return this.plank(name);
+    if (kind === "brick") return this.brick(name);
     if (kind === "coin") {
-      const m = this.cylinder(
-        name,
-        0,
-        0,
-        0,
-        0.15,
-        0.15,
-        0.055,
-        palette.gold,
-        10,
-      );
-      m.rotation.x = Math.PI / 2;
-      const face = this.box(
-        "coin-rune",
-        0,
-        0,
-        -0.035,
-        0.065,
-        0.15,
-        0.018,
-        0xffe5a5,
-      );
-      face.rotation.z = 0.7;
-      return this.merge(name, [m, face]);
+      const body = this.cylinder(name, 0, 0, 0, 0.16, 0.16, 0.066, 0xd9912d, 16);
+      body.rotation.x = Math.PI / 2;
+      const parts = [body];
+      for (const sign of [-1, 1]) {
+        const face = this.cylinder(
+          name + "-gold-face", 0, 0, sign * 0.036, 0.129, 0.129, 0.009, 0xffd45e, 16,
+        );
+        face.rotation.x = Math.PI / 2;
+        const stamp = this.box(
+          name + "-light-emblem", 0, 0, sign * 0.043, 0.105, 0.105, 0.009, 0xfff0ac,
+        );
+        stamp.rotation.z = Math.PI / 4;
+        parts.push(face, stamp);
+      }
+      return this.merge(name, parts);
     }
+    const leaf = this.box("berry-leaf", 0.035, 0.135, 0, 0.17, 0.035, 0.085, 0x579d47);
+    leaf.rotation.z = 0.42;
     return this.merge(name, [
-      this.sphere(name, 0, 0, 0, 0.23, 0.25, 0.22, 0xec8a72, true),
-      this.box("leaf", 0.05, 0.15, 0, 0.15, 0.025, 0.07, 0x86b878),
+      this.sphere(name, -0.065, 0, 0, 0.23, 0.25, 0.22, 0xe65344),
+      this.sphere(name + "-small-berry", 0.09, -0.025, 0.035, 0.18, 0.19, 0.18, 0xf88b56),
+      leaf,
     ]);
   }
   grass(seed: number) {
@@ -508,7 +527,7 @@ export class Art {
     });
     const wood = this.merge("helper-bundle", logs);
     wood.parent = root;
-    const stone = this.rock("helper-stone", 0.68, palette.stoneLight, id);
+    const stone = this.stonePiece("helper-stone", 0.68);
     stone.position.set(0, 0.57, -0.42);
     stone.parent = root;
     root.setEnabled(false);
@@ -1054,21 +1073,16 @@ export class Art {
     cargoRoot.position.set(0, 1.12, -0.62);
     const cargoSource = this.log("cargo-log-source");
     cargoSource.setEnabled(false);
-    const stoneSource = this.rock(
-      "cargo-stone-source",
-      0.33,
-      palette.stoneLight,
-      0,
-    );
+    const stoneSource = this.stonePiece("cargo-stone-source", 0.33);
     stoneSource.setEnabled(false);
     const wood = Array.from({ length: maxCargo }, (_, i) => {
         const m = cargoSource.createInstance("carried-log-" + i);
         m.scaling.x = 1.35;
         m.parent = cargoRoot;
         m.position.set(
-          ((i % 2) - 0.5) * 0.34,
+          ((i % 2) - 0.5) * 0.09,
           Math.floor(i / 2) * 0.34,
-          Math.sin(i * 3) * 0.055,
+          ((i % 2) - 0.5) * 0.42 + Math.sin(i * 3) * 0.025,
         );
         m.rotation.y = Math.floor(i / 2) % 2 ? 0.12 : -0.12;
         m.setEnabled(false);
@@ -1081,23 +1095,14 @@ export class Art {
         m.setEnabled(false);
         return m;
       });
-    const planks = this.box(
-      "carried-planks",
-      0,
-      0,
-      0,
-      1.05,
-      0.15,
-      0.35,
-      palette.cut,
-    );
+    const planks = this.plank("carried-planks", 1.05, 0.15, 0.35);
     planks.parent = cargoRoot;
     const plankMatrices = new Float32Array(maxCargo * 16);
     for (let i = 0; i < maxCargo; i++)
       Matrix.Translation(
-        ((i % 2) - 0.5) * 0.4,
+        ((i % 2) - 0.5) * 0.06,
         Math.floor(i / 2) * 0.24,
-        0.1,
+        0.1 + ((i % 2) - 0.5) * 0.39,
       ).copyToArray(plankMatrices, i * 16);
     planks.thinInstanceSetBuffer("matrix", plankMatrices, 16, true);
     planks.thinInstanceCount = 0;

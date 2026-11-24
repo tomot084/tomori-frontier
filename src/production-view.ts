@@ -37,26 +37,8 @@ export class ProductionView {
       game.stage.layout;
     this.sources = {
       wood: art.log("production-log-source"),
-      plank: art.box(
-        "production-plank-source",
-        0,
-        0,
-        0,
-        1.1,
-        0.16,
-        0.36,
-        palette.cut,
-      ),
-      brick: art.box(
-        "production-brick-source",
-        0,
-        0,
-        0,
-        0.55,
-        0.26,
-        0.35,
-        0xcc9978,
-      ),
+      plank: art.plank("production-plank-source"),
+      brick: art.brick("production-brick-source"),
       stone: art.resource("stone", "production-stone-source"),
       food: art.resource("food", "production-food-source"),
       coin: art.resource("coin", "production-coin-source"),
@@ -76,14 +58,16 @@ export class ProductionView {
       mesh.isVisible = true;
       mesh.visibility = 1;
       const matrices = new Float32Array(100 * 16);
-      const cols = kind === "coin" ? 5 : 4;
+      const cols = kind === "coin" ? 5 : 2;
       for (let i = 0; i < 100; i++) {
         const row = Math.floor(i / cols);
+        const along = kind === "coin" ? 0.38 : kind === "wood" ? 0.88 : 1.14;
+        const across = kind === "coin" ? 0.24 : kind === "wood" ? 0.38 : 0.39;
         Matrix.Translation(
-          ((i % cols) - (cols - 1) / 2) * (kind === "wood" ? 0.46 : 0.38),
+          ((i % cols) - (cols - 1) / 2) * along,
           (kind === "coin" ? 1.05 : 1.1) +
-            Math.floor(row / 4) * (kind === "wood" ? 0.42 : 0.18),
-          ((row % 4) - 1.5) * (kind === "coin" ? 0.24 : 0.36),
+            Math.floor(row / 4) * (kind === "wood" ? 0.36 : 0.18),
+          ((row % 4) - 1.5) * across,
         ).copyToArray(matrices, i * 16);
       }
       mesh.position.copyFrom(
@@ -371,10 +355,12 @@ export class ProductionView {
         this.game.investments.economy.stock,
         this.game.investments.production.uncollected,
       ][index];
-      const height =
-        1.1 +
-        Math.floor(Math.min(99, count) / 16) *
-          (pile.kind === "wood" ? 0.6 : 0.23);
+      const scale = pile.kind === "coin" ? 1.15 : pile.kind === "wood" ? 1.45 : 1.25;
+      const height = scale * (
+        (pile.kind === "coin" ? 1.05 : 1.1) +
+        Math.floor(Math.min(99, count) / (pile.kind === "coin" ? 20 : 8)) *
+          (pile.kind === "wood" ? 0.36 : 0.18)
+      );
       if (at(e.x, e.y)) {
         f.from.y = height;
         if (pile.kind === "wood") f.from.z += 1.25;

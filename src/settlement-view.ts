@@ -367,7 +367,7 @@ export class SettlementView {
             id === "orchard"
               ? a.resource("food", "orchard-stock")
               : id === "kiln"
-                ? a.box("stored-brick", 0, 0, 0, 0.5, 0.25, 0.3, 0xcc9978)
+                ? a.brick("stored-brick", 0.5, 0.25, 0.3)
                 : a.resource("stone", "mine-stock");
           stock.parent = root;
           stock.position.set(1.0, 0.65, -0.9);
@@ -427,22 +427,14 @@ export class SettlementView {
     const w = this.game.settlements.workers[index],
       a = this.art;
     const rig = a.helper(w.id === "minerCamp" ? 1 : 0);
-    const cargo = a.merge(`worker-${w.id}-cargo`, [
-      a.box(
-        "carried-good",
-        0,
-        1.05,
-        -0.45,
-        0.8,
-        0.3,
-        0.45,
-        w.id === "kiln"
-          ? 0xcc9978
-          : w.id === "orchard"
-            ? 0xe59c7b
-            : palette.cut,
-      ),
-    ]);
+    const cargo =
+      w.id === "kiln"
+        ? a.brick(`worker-${w.id}-cargo`, 0.8, 0.3, 0.45)
+        : w.id === "orchard"
+          ? a.resource("food", `worker-${w.id}-cargo`)
+          : a.plank(`worker-${w.id}-cargo`, 0.8, 0.22, 0.45);
+    if (w.id === "orchard") cargo.scaling.setAll(2.1);
+    cargo.position.set(0, 1.05, -0.45);
     cargo.parent = rig.root;
     const shadow = a.cylinder(
       "settler-contact-shadow",

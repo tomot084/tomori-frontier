@@ -779,7 +779,9 @@ export class WorldView {
     const bulk = stackBulk(s.resources.wood);
     this.rig.wood.forEach((m, i) => {
       m.setEnabled(i < wood);
-      m.scaling.set(1.35 * bulk, 1 + (bulk - 1) * 0.16, 1 + (bulk - 1) * 0.16);
+      const thickness = 1 + (bulk - 1) * 0.16;
+      m.scaling.set(1.35 * bulk, thickness, thickness);
+      m.position.z = ((i % 2) - 0.5) * 0.42 * thickness + Math.sin(i * 3) * 0.025;
     });
     this.rig.planks.thinInstanceCount = visualStack(
       this.model.investments.production.carried,
@@ -913,7 +915,7 @@ export class WorldView {
     const visibleWood = visualStack(m.s.resources.wood);
     for (let i = 0; i < visibleWood; i++)
       this.rig.wood[i].position.x =
-        ((i % 2) - 0.5) * 0.34 +
+        ((i % 2) - 0.5) * 0.09 +
         Math.sin(this.time * 6 - i * 0.12) *
           m.moving *
           Math.floor(i / 2) *
