@@ -211,19 +211,28 @@ export class InvestmentView {
           parts.push(
             art.box("market-post", x, 1.48, 0.7, 0.24, 2.8, 0.24, 0x965839),
           );
-        // Slightly sloped canopy with broad alternating cloth panels.
+        // Curved canvas canopy with a scalloped front and a timber support frame.
+        for (const z of [-0.20, 1.46])
+          parts.push(art.box("awning-support-beam", 0, 2.53, z, 2.75, 0.13, 0.13, 0x9d6542));
         for (let k = 0; k < 5; k++) {
-          const panel = art.box(
-            "awning-panel", (k - 2) * 0.6, 2.76, 0.65, 0.61, 0.20, 1.95,
-            k % 2 ? 0xffe7b4 : 0xcc5942,
-          );
-          panel.rotation.x = -0.12;
-          parts.push(panel);
+          const x = (k - 2) * 0.59, tint = k % 2 ? 0xffe9ba : 0xd35d46;
+          // Three adjoining sloped segments create a gently arched canopy.
+          for (const [z,y,angle] of [[-0.03,2.70,-0.35],[0.64,2.88,0],[1.31,2.70,0.35]]) {
+            const panel = art.box("awning-cloth", x, y, z, 0.60, 0.115, 0.72, tint);
+            panel.rotation.x = angle;
+            parts.push(panel);
+          }
           parts.push(
-            art.box("awning-valance", (k - 2) * 0.6, 2.57, -0.31, 0.61, 0.25, 0.16,
-              k % 2 ? 0xffe7b4 : 0xcc5942),
+            art.box("awning-valance", x, 2.49, -0.40, 0.60, 0.25, 0.10, tint),
+            art.sphere("awning-scallop", x, 2.36, -0.40, 0.59, 0.22, 0.12, tint),
           );
         }
+        for (const x of [-0.86,0,0.86])
+          parts.push(art.box("counter-wood-stile", x, 0.64, 0.10, 0.09, 0.60, 0.08, 0x98603b));
+        parts.push(
+          art.box("cash-drawer", 0.72, 1.23, 0.55, 0.48, 0.22, 0.36, 0x417979),
+          art.box("cash-drawer-handle", 0.72, 1.23, 0.35, 0.19, 0.045, 0.05, 0xf0c776),
+        );
         const emblem = art.resource("coin", "market-coin-sign");
         emblem.scaling.setAll(2.5);
         emblem.position.set(0, 2.24, -0.37);

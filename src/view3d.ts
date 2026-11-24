@@ -289,11 +289,12 @@ export class WorldView {
       contact.position.copyFrom(worldPoint(x, y, 0.045));
     }
     this.rig = this.art.player();
-    this.rig.root.scaling.setAll(1.25);
+    // Keep collision and movement unchanged; only the player visual rig is smaller.
+    this.rig.root.scaling.setAll(1.05);
     this.rig.root.rotation.y = Math.PI;
     this.playerRing = MeshBuilder.CreateTorus(
       "keeper-foot-ring",
-      { diameter: 1.45, thickness: 0.075, tessellation: 32 },
+      { diameter: 1.32, thickness: 0.09, tessellation: 32 },
       this.scene,
     );
     const playerPaint = new StandardMaterial("player-selection", this.scene);
@@ -462,7 +463,7 @@ export class WorldView {
     this.height = this.canvas.parentElement!.clientHeight;
     this.engine.resize();
     const ratio = this.width / this.height;
-    const halfHeight = ratio < 0.8 ? 11.1 : 11.6;
+    const halfHeight = ratio < 0.8 ? 13.1 : 12.8;
     const halfWidth = halfHeight * ratio;
     this.camera.orthoLeft = -halfWidth;
     this.camera.orthoRight = halfWidth;
@@ -1438,6 +1439,7 @@ export class WorldView {
         this.engine.getRenderHeight(),
       ],
       orthographic: this.camera.mode === Camera.ORTHOGRAPHIC_CAMERA,
+      playerVisualScale: this.rig.root.scaling.x,
       meshes: this.scene.meshes.length,
       active: this.scene.getActiveMeshes().length,
       visibleActors: this.visibleActors,

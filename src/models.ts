@@ -278,11 +278,26 @@ export class Art {
     );
   }
   stonePiece(name: string, size = 0.32) {
-    const mesh = this.rock(name, size, 0x739eae);
-    return this.paintItem(mesh, (_x, y, _z, nx, ny, nz) =>
-      ny > 0.4 || y > size * 0.65 ? 0xc3e3e8
-        : nx + nz > 0.35 ? 0x82b6c4 : 0x537d95,
-    );
+    // A chipped stone with several broad planar faces, distinct from timber.
+    // Flat-shaded low-poly source stays cheap when represented by many instances.
+    const mesh = MeshBuilder.CreateIcoSphere(name, { radius: 0.5, subdivisions: 1, flat: true }, this.scene);
+    const p = mesh.getVerticesData(VertexBuffer.PositionKind)!;
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i], y = p[i + 1], z = p[i + 2];
+      const k = 0.90 + 0.16 * Math.cos(x * 11 + z * 6);
+      p[i] = x * size * k * 1.12;
+      p[i + 1] = (Math.max(-0.35, Math.min(0.39, y)) + 0.35) * size;
+      p[i + 2] = z * size * k * 0.90;
+    }
+    mesh.setVerticesData(VertexBuffer.PositionKind, p);
+    const normals: number[] = [];
+    VertexData.ComputeNormals(p, mesh.getIndices()!, normals);
+    mesh.setVerticesData(VertexBuffer.NormalKind, normals);
+    mesh.refreshBoundingInfo();
+    this.tint(mesh, 0x739eae);
+    return this.paintItem(mesh, (_x, _y, _z, nx, ny, nz) =>
+      ny > 0.65 ? 0xd0e5e5 : ny < -0.4 ? 0x526e83
+        : nx + nz > 0.45 ? 0x9bbdc9 : 0x66899f);
   }
   /** Rounded, broad foliage with a dark underside and sunlit crown.
    *  One shared material; no textures, extra draw calls or runtime animation.
@@ -679,63 +694,45 @@ export class Art {
     return { root, body, wood, stone };
   }
   camp() {
-    const p: Mesh[] = [];
-    p.push(this.box("floor", 0, 0.045, 0, 2.3, 0.09, 1.9, 0xb18d61));
-    for (let i = 0; i < 5; i++)
-      p.push(
-        this.box(
-          "floor-plank",
-          (i - 2) * 0.43,
-          0.096,
-          0,
-          0.4,
-          0.025,
-          1.88,
-          0xcba775,
-        ),
-      );
-    for (const x of [-0.83, 0.83])
-      p.push(
-        this.cylinder("tent-pole", x, 0.77, 0, 0.1, 0.1, 1.52, 0x9e744d, 6),
-      );
-    const roof = this.box(
-      "sloping-canopy",
-      -0.42,
-      1.11,
-      0,
-      1.3,
-      0.18,
-      2.03,
-      0x3e8e8d,
-    );
-    roof.rotation.z = 0.62;
-    const roof2 = this.box(
-      "sloping-canopy",
-      0.42,
-      1.11,
-      0,
-      1.3,
-      0.18,
-      2.03,
-      0x56aaa3,
-    );
-    roof2.rotation.z = -0.62;
-    p.push(roof, roof2);
-    p.push(this.box("rear-cloth", 0, 0.63, 0.87, 1.53, 1.13, 0.045, 0x39817b));
-    p.push(this.box("workbench", -0.24, 0.58, 0.12, 1.19, 0.13, 0.6, 0xb88956));
-    for (const x of [-0.7, 0.25])
-      p.push(this.box("bench-leg", x, 0.28, 0.12, 0.08, 0.52, 0.45, 0x916342));
-    p.push(this.box("toolbox", 0.47, 0.22, -0.64, 0.4, 0.4, 0.42, 0xd1a369));
+    // A small timber-framed workshop with individually laid roof boards,
+    // open working front, eaves and a recognizable hanging lantern.
+    const p: Mesh[] = [
+      this.box("foundation", 0, 0.09, 0, 2.42, 0.18, 2.12, 0x8a8a7c),
+      this.box("floor", 0, 0.205, 0, 2.28, 0.10, 1.96, 0xa97a4c),
+    ];
+    for (let i = 0; i < 6; i++)
+      p.push(this.box("floor-board", (i - 2.5) * 0.36, 0.27, 0, 0.34, 0.055, 1.92, i % 2 ? 0xd5ad73 : 0xc59a60));
+    for (const x of [-0.91, 0.91]) {
+      for (const z of [-0.78, 0.78]) {
+        p.push(this.box("stone-post-foot", x, 0.28, z, 0.32, 0.22, 0.32, 0x8faaa9));
+        p.push(this.box("timber-post", x, 0.92, z, 0.17, 1.26, 0.20, 0x96603a));
+        const brace = this.box("roof-brace", x * 0.86, 1.32, z, 0.15, 0.51, 0.18, 0xb7824b);
+        brace.rotation.z = x > 0 ? -0.54 : 0.54; p.push(brace);
+      }
+      p.push(this.box("eaves-beam", x, 1.52, 0, 0.22, 0.18, 2.16, 0x93613b));
+    }
+    for (let k = 0; k < 5; k++) {
+      const z = (k - 2) * 0.43;
+      p.push(this.box("back-wall-board", (k - 2) * 0.34, 0.90, 0.80, 0.32, 1.14, 0.105, k % 2 ? 0xd3ab75 : 0xe1bc85));
+      for (const side of [-1, 1]) {
+        const panel = this.box("roof-plank", side * 0.48, 1.76, z, 1.25, 0.16, 0.42, (k + side) % 2 ? 0x3b8b8a : 0x51a5a1);
+        panel.rotation.z = -side * 0.49; p.push(panel);
+      }
+    }
     p.push(
-      this.cylinder("lamp-post", 1.22, 0.76, 0, 0.048, 0.063, 1.5, 0x856240, 7),
+      this.box("ridge-cap", 0, 2.10, 0, 0.20, 0.18, 2.27, 0x285e65),
+      this.box("rear-crossbar", 0, 1.28, 0.73, 1.86, 0.14, 0.10, 0x9b6a41),
+      this.box("workbench", -0.25, 0.80, 0.26, 1.24, 0.15, 0.65, 0xe3b87c),
+      this.box("bench-leg", -0.71, 0.51, 0.26, 0.15, 0.50, 0.48, 0x99623b),
+      this.box("bench-leg", 0.22, 0.51, 0.26, 0.15, 0.50, 0.48, 0x99623b),
+      this.box("toolbox", 0.52, 0.46, -0.53, 0.48, 0.38, 0.37, 0xbd854c),
+      this.box("toolbox-handle", 0.52, 0.69, -0.53, 0.22, 0.08, 0.11, 0x536b74),
     );
-    p.push(this.cylinder("lamp", 1.22, 1.48, 0, 0.16, 0.19, 0.28, 0xffda87, 8));
-    p.push(
-      this.cylinder("lamp-roof", 1.22, 1.68, 0, 0, 0.24, 0.18, 0x367679, 8),
-    );
-    const log = this.log("workshop-logs");
-    log.position.set(0.28, 0.2, 1.15);
-    p.push(log);
+    p.push(this.cylinder("lamp-post", 1.25, 0.88, -0.23, 0.065, 0.09, 1.76, 0x95623d, 12));
+    p.push(this.box("lantern-bracket", 1.40, 1.74, -0.23, 0.38, 0.10, 0.10, 0x485e66));
+    p.push(this.cylinder("lantern-body", 1.55, 1.43, -0.23, 0.15, 0.17, 0.33, 0xffdf87, 12));
+    p.push(this.cylinder("lantern-cap", 1.55, 1.64, -0.23, 0.06, 0.21, 0.14, 0x356d72, 12));
+    p.push(this.cylinder("lantern-base", 1.55, 1.23, -0.23, 0.19, 0.15, 0.09, 0x356d72, 12));
     return this.merge("lantern-workshop", p);
   }
   enemy(type: number) {

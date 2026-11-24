@@ -151,8 +151,9 @@ for (const size of [
       await expect.poll(async () => (await inspect()).cargo.wood).toBe(pieces);
       const metrics = await inspect();
       expect(metrics.cargo.bulk).toBeCloseTo(bulk, 3);
+      expect(metrics.playerVisualScale).toBeCloseTo(1.05, 3);
       expect(metrics.cameraSpan[1]).toBeCloseTo(
-        size.width < 500 ? 22.2 : 23.2,
+        size.width < 500 ? 26.2 : 25.6,
         3,
       );
       if (stackMeshes !== undefined) expect(metrics.meshes).toBe(stackMeshes);
