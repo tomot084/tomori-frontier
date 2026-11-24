@@ -152,38 +152,40 @@ export class MachineView {
     }
     const turret = this.sites[0].root;
     const base = a.merge("turret-chassis", [
-      a.cylinder("turret-plinth", 0, 0.28, 0, 1.2, 1.45, 0.5, palette.stone),
-      a.cylinder("turret-column", 0, 0.79, 0, 0.58, 0.85, 0.7, palette.teal),
-      a.cylinder("turret-bearing", 0, 1.17, 0, 0.88, 0.88, 0.14, palette.gold),
+      a.cylinder("turret-plinth", 0, 0.28, 0, 1.20, 1.45, 0.50, 0x596e76, 16),
+      a.cylinder("turret-column", 0, 0.79, 0, 0.62, 0.90, 0.70, 0x925048, 12),
+      a.cylinder("turret-bearing", 0, 1.17, 0, 0.91, 0.91, 0.18, 0xe5aa54, 16),
     ]);
     base.parent = turret;
     this.head = new TransformNode("rotating-turret", a.scene);
     this.head.parent = turret;
     this.head.position.y = 1.3;
     const housing = a.merge("turret-head", [
-      a.box("gun-housing", 0, 0, 0, 1.45, 0.65, 1, palette.teal),
-      a.box("turret-roof", 0, 0.39, 0, 1.65, 0.14, 1.2, palette.cream),
-      a.box("lamp-sight", 0, 0.25, 0.53, 0.26, 0.18, 0.13, palette.gold),
+      a.box("gun-housing", 0, 0.07, 0, 1.60, 0.79, 1.15, 0xb76548),
+      a.box("turret-roof", 0, 0.48, 0, 1.70, 0.18, 1.25, 0xe3a55c),
+      a.box("armored-front", 0, 0.02, 0.56, 1.45, 0.60, 0.26, 0x4d606c),
+      a.box("lamp-sight", 0, 0.36, 0.65, 0.32, 0.16, 0.13, 0xffe698),
     ]);
     housing.parent = this.head;
     for (let k = 0; k < 2; k++) {
       const node = new TransformNode(`gun-${k}`, a.scene);
       node.parent = this.head;
-      const barrel = a.merge(`barrel-${k}`, [
-        a.box("gun-barrel", 0, 0, 0.83, 0.32, 0.32, 1.6, palette.ink),
-        a.box("barrel-band", 0, 0, 1.25, 0.39, 0.39, 0.18, palette.gold),
-        a.box("barrel-muzzle", 0, 0, 1.64, 0.19, 0.19, 0.05, 0x172b36),
-      ]);
+      const barrelParts: Mesh[] = [];
+      // A thick round cannon with a distinct dark bore and bright metal collar.
+      for (const [z, radius, length, tint] of [
+        [0.58, 0.29, 0.55, 0x596e79],
+        [0.99, 0.21, 0.64, 0x344853],
+        [1.29, 0.30, 0.22, 0xe5aa54],
+        [1.41, 0.19, 0.025, 0x172b36],
+      ]) {
+        const piece = a.cylinder("gun-section", 0, 0, z, radius, radius, length, tint, 16);
+        piece.rotation.x = Math.PI / 2;
+        barrelParts.push(piece);
+      }
+      const barrel = a.merge(`barrel-${k}`, barrelParts);
       barrel.parent = node;
       const flash = a.sphere(
-        "muzzle-flash",
-        0,
-        0,
-        1.86,
-        0.65,
-        0.65,
-        0.85,
-        palette.gold,
+        "muzzle-flash", 0, 0, 1.56, 0.65, 0.65, 0.85, palette.gold,
       );
       flash.parent = node;
       this.muzzle.push(flash);
@@ -216,9 +218,10 @@ export class MachineView {
     const miner = this.sites[1].root;
     const machine = a.merge("drill-chassis", [
       a.box("drill-feet", 0, 0.2, 0, 2.3, 0.4, 1.85, palette.ink),
-      a.box("drill-engine", -0.3, 0.95, 0, 1.6, 1.3, 1.3, palette.teal),
-      a.box("drill-roof", -0.3, 1.7, 0, 1.85, 0.2, 1.6, palette.gold),
-      a.box("stone-output-bin", 0, 0.38, -1.2, 1.8, 0.65, 0.6, palette.wood),
+      a.box("drill-engine", -0.3, 0.95, 0, 1.6, 1.3, 1.3, 0xe1a64b),
+      a.box("drill-roof", -0.3, 1.7, 0, 1.85, 0.2, 1.6, 0xf4cc76),
+      a.box("drill-side-panel", -0.3, 0.98, -0.68, 1.18, 0.66, 0.14, 0x556b78),
+      a.box("stone-output-bin", 0, 0.38, -1.2, 1.8, 0.65, 0.6, 0x547f93),
       a.box("drill-exhaust", -0.8, 1.75, 0.45, 0.2, 0.9, 0.2, palette.ink),
     ]);
     machine.parent = miner;
@@ -233,25 +236,28 @@ export class MachineView {
       palette.stoneLight,
     );
     this.piston.parent = miner;
-    this.drill = a.cylinder(
-      "rotating-drill-bit",
-      1.55,
-      0.95,
-      0,
-      0.02,
-      0.35,
-      0.65,
-      palette.ink,
-    );
-    this.drill.rotation.z = -Math.PI / 2;
+    // Build along the X axis once, then spin along that axis while mining.
+    const bitParts: Mesh[] = [];
+    const tip = a.cylinder("drill-tip", 0, 0, 0, 0.025, 0.38, 0.92, 0x718f9f, 16);
+    tip.rotation.z = -Math.PI / 2;
+    bitParts.push(tip);
+    for (const [x, radius] of [[-0.29, 0.40], [-0.07, 0.31], [0.15, 0.20]]) {
+      const collar = a.cylinder("drill-ridge", x, 0, 0, radius * 0.78, radius, 0.17, 0xbad4da, 12);
+      collar.rotation.z = -Math.PI / 2;
+      bitParts.push(collar);
+      const flute = a.box("drill-flute", x, radius * 0.73, 0, 0.14, 0.11, radius * 0.78, 0x3c596a);
+      bitParts.push(flute);
+    }
+    this.drill = a.merge("rotating-drill-bit", bitParts);
+    this.drill.position.set(1.55, 0.95, 0);
     this.drill.parent = miner;
     const tower = this.sites[2].root;
     const body = a.merge("recovery-tower", [
       a.cylinder("tower-foot", 0, 0.3, 0, 1, 1.25, 0.6, palette.stone),
-      a.cylinder("tower-mast", 0, 1.5, 0, 0.3, 0.55, 2.4, palette.teal),
-      a.cylinder("tower-collar", 0, 2.7, 0, 0.8, 0.8, 0.2, palette.gold),
-      a.sphere("tower-lantern", 0, 3, 0, 0.9, 0.9, 0.9, palette.gold),
-      a.cylinder("tower-roof", 0, 3.55, 0, 0, 1, 0.5, palette.teal),
+      a.cylinder("tower-mast", 0, 1.5, 0, 0.33, 0.55, 2.4, 0x347f9a),
+      a.cylinder("tower-collar", 0, 2.7, 0, 0.85, 0.85, 0.22, 0x8ed8d8),
+      a.sphere("tower-lantern", 0, 3, 0, 1.15, 1.15, 1.15, 0x9cf1df),
+      a.cylinder("tower-roof", 0, 3.68, 0, 0.13, 1, 0.46, 0x347f9a),
     ]);
     body.parent = tower;
     this.crown = new TransformNode("tower-intake-rotor", a.scene);
@@ -371,7 +377,7 @@ export class MachineView {
         : 0;
       this.piston.position.x = 0.9 + stroke;
       this.drill.position.x = 1.55 + stroke;
-      this.drill.rotation.y = m.drillWorking ? g.time / 55 : 0;
+      if (m.drillWorking) this.drill.rotation.x = g.time / 55;
       const amount = i.economy.drillStock ?? 0;
       this.stones.forEach((stone, k) =>
         stone.setEnabled(k < Math.min(24, Math.ceil(amount / 4))),

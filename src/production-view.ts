@@ -179,17 +179,17 @@ export class ProductionView {
       }
     }
     this.conveyor = new TransformNode("purchased-conveyor", art.scene);
-    const belt = art.box("teal-belt", 0, 0.72, 0, 4.8, 0.3, 1.85, palette.teal);
+    const belt = art.box("charcoal-belt", 0, 0.72, 0, 4.8, 0.3, 1.85, 0x304951);
     belt.parent = this.conveyor;
     const slatSource = art.box(
       "belt-slat-source",
       0,
       0.9,
       0,
-      0.09,
+      0.13,
       0.05,
       1.75,
-      palette.cut,
+      0x749194,
     );
     slatSource.setEnabled(false);
     for (let i = 0; i < 24; i++) {
@@ -200,7 +200,7 @@ export class ProductionView {
       this.slats.push(m);
     }
     for (const z of [-1, 1]) {
-      const m = art.box("belt-rail", 0, 0.9, z, 4.95, 0.18, 0.12, palette.gold);
+      const m = art.box("belt-rail", 0, 0.9, z, 4.95, 0.20, 0.19, 0xe6a94b);
       m.parent = this.conveyor;
     }
     // Wide roller chassis and repeated left-pointing chevrons make the feed readable at phone scale.
@@ -237,10 +237,10 @@ export class ProductionView {
         0,
         0.94,
         side * 0.24,
-        0.55,
+        0.59,
         0.045,
-        0.11,
-        palette.gold,
+        0.15,
+        0xffdf8e,
       );
       arrow.rotation.y = side * -0.65;
       return arrow;
@@ -276,37 +276,26 @@ export class ProductionView {
     this.fastMotor = fast;
     this.conveyor.position.copyFrom(worldPoint(sawPoint.x, inputPoint.y, 0.4));
     this.conveyor.setEnabled(false);
-    this.saw = art.cylinder(
-      "working-saw",
-      0,
-      0,
-      0,
-      0.8,
-      0.8,
-      0.18,
-      palette.stoneLight,
-      16,
-    );
+    // Bake the hub and teeth into a single mesh so the whole blade rotates
+    // together, with no per-tooth meshes to render or update.
+    const bladeParts = [
+      art.cylinder("saw-disc", 0, 0, 0, 0.88, 0.88, 0.13, 0x91b5c2, 24),
+      art.cylinder("saw-face", 0, 0.074, 0, 0.76, 0.76, 0.018, 0xc9e1e3, 24),
+      art.cylinder("saw-rear", 0, -0.074, 0, 0.76, 0.76, 0.018, 0xc9e1e3, 24),
+      art.cylinder("saw-hub", 0, 0, 0, 0.24, 0.24, 0.23, 0x496b79, 12),
+    ];
+    for (let k = 0; k < 12; k++) {
+      const angle = (k * Math.PI * 2) / 12;
+      const tooth = art.box(
+        "saw-tooth", Math.sin(angle) * 0.89, 0, Math.cos(angle) * 0.89,
+        0.19, 0.17, 0.22, 0xe4f0e8,
+      );
+      tooth.rotation.y = angle + 0.25;
+      bladeParts.push(tooth);
+    }
+    this.saw = art.merge("working-saw", bladeParts);
     this.saw.rotation.x = Math.PI / 2;
     this.saw.position.copyFrom(worldPoint(sawPoint.x, sawPoint.y + 6, 1.35));
-    for (let i = 0; i < 10; i++) {
-      const tooth = art.box(
-        "saw-tooth",
-        0,
-        0,
-        0,
-        0.13,
-        0.16,
-        0.14,
-        palette.cream,
-      );
-      tooth.position.set(
-        Math.sin((i * Math.PI) / 5) * 0.8,
-        0,
-        Math.cos((i * Math.PI) / 5) * 0.8,
-      );
-      tooth.parent = this.saw;
-    }
   }
   event(e: GameEvent) {
     const { inputPoint, sawPoint } = this.game.stage.layout;
