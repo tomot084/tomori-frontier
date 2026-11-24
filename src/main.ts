@@ -51,8 +51,8 @@ function boot() {
         view.syncSites();
       }
     },
-    () => {
-      const next = model.travel();
+    (destination) => {
+      const next = model.travel(destination);
       if (!next) {
         ui.toast("航路のそばで出発できます");
         return;

@@ -256,7 +256,55 @@ export class Art {
         : nx + nz > 0.35 ? 0x82b6c4 : 0x537d95,
     );
   }
+  private themedTree(seed: number, zone: number, harvestable: boolean) {
+    const biome = this.biome, parts: Mesh[] = [];
+    if (biome === "snow" || biome === "forest" || biome === "ice") {
+      const icy = biome === "ice";
+      parts.push(this.cylinder("theme-trunk", 0, 0.7, 0, 0.21, 0.30, 1.4, icy ? 0x589db4 : palette.wood));
+      for (let i = 0; i < 3; i++) {
+        const radius = (1 - i * 0.23) * (icy ? 0.84 : 1), y = 1.22 + i * 0.66;
+        const tint = icy ? [0x4c9bc6, 0x8bd9eb, 0xc7f2f6][i]
+          : (harvestable ? [0x247954, 0x328c5a, 0x50a46a] : [0x598c70, 0x6b9b7b, 0x87b396])[i];
+        parts.push(this.cylinder("theme-pine-tier", 0, y, 0, 0.05, radius, 1.1, tint, 12));
+        if (biome === "snow")
+          parts.push(this.cylinder("snow-cap", 0, y + 0.24, 0, 0.025, radius * 0.76, 0.76, 0xf0f7f4, 12));
+      }
+    } else if (biome === "desert") {
+      parts.push(this.cylinder("palm-trunk", 0, 1.23, 0, 0.17, 0.30, 2.46, 0xaa7649));
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3;
+        const leaf = this.sphere("palm-frond", Math.sin(a) * 0.60, 2.48, Math.cos(a) * 0.60,
+          0.44, 0.24, 1.52, i % 2 ? 0x68a24d : 0x3d8955);
+        leaf.rotation.y = a;
+        leaf.rotation.x = 0.25;
+        parts.push(leaf);
+      }
+      parts.push(this.sphere("palm-heart", 0, 2.50, 0, 0.48, 0.52, 0.48, 0xd7b170));
+    } else if (biome === "volcano") {
+      parts.push(this.cylinder("charred-trunk", 0, 0.92, 0, 0.18, 0.39, 1.84, 0x56413c));
+      for (const side of [-1, 1]) {
+        const branch = this.cylinder("charred-branch", side * 0.43, 1.72, 0, 0.09, 0.18, 1.02, 0x634740);
+        branch.rotation.z = -side * 0.54;
+        parts.push(branch, this.sphere("ember-crown", side * 0.61, 2.12, 0, 1, 0.87, 0.90, harvestable ? 0xc66b44 : 0x98705d));
+      }
+      parts.push(this.sphere("ember-crown", 0, 2.42, 0.06, 1.35, 1.18, 1.22, harvestable ? 0xe8a15a : 0xbb9271));
+    } else {
+      parts.push(this.cylinder("festival-trunk", 0, 0.81, 0, 0.23, 0.34, 1.62, 0xb2845c));
+      const shades = zone === 1 ? [0x76b8da, 0x9fd8e2] : [0xdd84b1, 0xf2b7c7];
+      for (let i = 0; i < 3; i++)
+        parts.push(this.sphere("festival-topiary", (i - 1) * 0.55, 2.1 + (i === 1 ? 0.46 : 0), 0,
+          i === 1 ? 1.73 : 1.25, i === 1 ? 1.66 : 1.25, 1.35, shades[i % 2]));
+    }
+    if (harvestable)
+      parts.push(this.box("fresh-trunk-notch", 0, 0.53, -0.28, 0.27, 0.12, 0.08, palette.cut));
+    const mesh = this.merge(harvestable ? "harvestable-broadleaf-tree" : "decorative-forest-tree", parts);
+    mesh.rotation.y = noise(seed) * Math.PI * 2;
+    if (!harvestable) mesh.scaling.setAll(0.9 + noise(seed + zone) * 0.12);
+    return mesh;
+  }
   tree(seed: number, zone = 0, harvestable = true) {
+    if (["forest", "snow", "ice", "volcano", "desert", "park"].includes(this.biome))
+      return this.themedTree(seed, zone, harvestable);
     // One family of broad, rounded crowns for both harvest and scenery trees.
     // Background uses the same silhouette with quieter colors and smaller scale.
     const parts = [
@@ -329,8 +377,14 @@ export class Art {
   }
 
   boulder(seed: number) {
-    const a = this.rock("boulder", 1.65, palette.stone, seed);
-    const b = this.rock("cracked-face", 0.72, palette.stoneLight, seed + 2);
+    const shades: Record<string, [number, number]> = {
+      snow: [0x91b4c4, 0xe6f2ef], ice: [0x619ebc, 0xade9ef],
+      volcano: [0x514a52, 0xad7461], desert: [0xb78b51, 0xe5b977],
+      forest: [0x668c75, 0x9bc3a2], park: [0x9a93bd, 0xd1b9df],
+    };
+    const [base, face] = shades[this.biome] ?? [palette.stone, palette.stoneLight];
+    const a = this.rock("boulder", 1.65, base, seed);
+    const b = this.rock("cracked-face", 0.72, face, seed + 2);
     b.position.set(-0.32, 0.13, -0.26);
     const vein = this.box(
       "mineral-vein",

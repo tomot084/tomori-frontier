@@ -61,8 +61,8 @@ export const contentCatalog = {
     price: 150,
     group: "探索",
     color: 0x7ab9cf,
-    effect: "航路を復旧し、別の3エリアを持つ霜灯群島へ",
-    benefit: "新しい森・敵・設備配置を探索する",
+    effect: "航路を復旧し、さまざまな群島を選んで探索する",
+    benefit: "雪原・氷晶・火山・砂漠・森林・遊園地などへ",
   },
 } as const;
 export type ContentId = keyof typeof contentCatalog;

@@ -341,11 +341,11 @@ export class InvestmentSystem {
           ),
         ),
         effect:
-          id === "portal" && this.game.stage.id !== "frontier"
-            ? "灯芽の群島へ戻る。両方の進行と設備を保存"
-            : id === "portal"
-              ? `航路を復旧して${getStage(this.game.stage.destination).name}へ渡る`
-              : def.effect,
+          id === "portal"
+            ? this.game.stage.id === "frontier"
+              ? "航路を復旧して新しい群島を選ぶ"
+              : `群島を選んで移動。${getStage(this.game.stage.destination).name}にも戻れる`
+            : def.effect,
         benefit: def.benefit,
       };
     }

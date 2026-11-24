@@ -1,6 +1,6 @@
 import { it, expect } from "vitest";
 import { fresh, load, stats } from "../src/data";
-import { getStage, frostStage, stages } from "../src/stages";
+import { getStage, frostStage, stages, stageDestinations } from "../src/stages";
 import { GameModel } from "../src/simulation";
 const run = (g: GameModel, ms: number) => {
   for (let t = 0; t < ms; t += 20) {
@@ -258,4 +258,44 @@ it("same machinery can be placed and priced in a later area without changing its
   } finally {
     delete stages.variant;
   }
+});
+
+it("visits all six themed archipelagos and restores their independent saved progress", () => {
+  const g = game();
+  const ids = ["forest", "snow", "ice", "volcano", "desert", "park"];
+  expect(stageDestinations(g.stage).map((s) => s.id)).toEqual(["frost", ...ids]);
+  expect(g.travel("snow")).toBeNull();
+  expect(g.investments.buy("portal")).toBe(true);
+  g.player = { ...g.settlements.place("portal") };
+  expect(g.travel("does-not-exist")).toBeNull();
+  expect(g.travel("frontier")).toBeNull();
+  const resources = { ...g.s.resources };
+  let world = g;
+  for (const [index, id] of ids.entries()) {
+    world.player = { ...world.settlements.place("portal") };
+    const next = world.travel(id)!;
+    expect(next.stage).toBe(id);
+    world = new GameModel(load(JSON.stringify(next)));
+    expect(world.stage.areas).toHaveLength(3);
+    expect(world.enemies).toHaveLength(96);
+    expect(world.stage.buildings).toHaveLength(3);
+    expect(world.nodes.some((n) => n.kind === "stone")).toBe(true);
+    expect(world.investments.content("portal")).toBe(true);
+    expect(world.s.resources).toEqual(resources);
+    world.s.progress[0].wood = index + 1;
+    world.investments.economy.discoveries = [world.stage.treasures[0].id];
+  }
+  for (const [index, id] of ids.entries()) {
+    if (world.stage.id !== id) {
+      world.player = { ...world.settlements.place("portal") };
+      world = new GameModel(load(JSON.stringify(world.travel(id)!)));
+    }
+    expect(world.s.progress[0].wood).toBe(index + 1);
+    expect(world.investments.economy.discoveries).toEqual([world.stage.treasures[0].id]);
+  }
+  world.player = { ...world.settlements.place("portal") };
+  const back = new GameModel(load(JSON.stringify(world.travel("frontier")!)));
+  expect(back.stage.id).toBe("frontier");
+  expect(back.s.resources).toEqual(resources);
+  expect(back.investments.content("portal")).toBe(true);
 });

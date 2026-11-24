@@ -1,5 +1,5 @@
 import { DefenseRaid } from "./raid";
-import { getStage, type StageDefinition } from "./stages";
+import { getStage, stageDestinations, type StageDefinition } from "./stages";
 import { Settlements } from "./settlements";
 import { WorldMachines } from "./world-machines";
 import { stackHeight } from "./cargo";
@@ -511,9 +511,9 @@ export class GameModel {
     if (i === 2) this.s.won = true;
     this.event("save", this.player);
   }
-  travel(): Save | null {
+  travel(destination = this.stage.destination): Save | null {
     const portal = this.stage.contents.find((c) => c.id === "portal");
-    if (!portal) return null;
+    if (!portal || !stageDestinations(this.stage).some((s) => s.id === destination)) return null;
     if (
       !this.investments.content("portal") ||
       this.s.zone < portal.unlock ||
@@ -533,7 +533,7 @@ export class GameModel {
         won: current.won,
       },
     };
-    const target = getStage(this.stage.destination),
+    const target = getStage(destination),
       archive = worlds[target.id];
     return {
       ...current,

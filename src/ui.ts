@@ -1,4 +1,4 @@
-import { getStage } from "./stages";
+import { getStage, stageDestinations } from "./stages";
 import { contentCatalog, isContent } from "./content";
 import { upgradeLimit } from "./data";
 import {
@@ -57,7 +57,7 @@ export class GameUI {
   constructor(
     public model: GameModel,
     buy: (u: Upgrade) => void,
-    private travel?: () => void,
+    private travel?: (destination?: string) => void,
   ) {
     el("goal").addEventListener("click", (event) => {
       const id = (event.target as HTMLElement).closest("button")?.id;
@@ -118,8 +118,9 @@ export class GameUI {
     };
     el("market-action").onclick = (event) => {
       const target = event.target as Element;
-      if (target.closest("#stage-travel")) {
-        this.travel?.();
+      const travelButton = target.closest<HTMLButtonElement>("#stage-travel, [data-stage-travel]");
+      if (travelButton) {
+        this.travel?.(travelButton.dataset.stageTravel);
         return;
       }
       const route = target.closest<HTMLButtonElement>("[data-board-route]");
@@ -345,7 +346,7 @@ export class GameUI {
       const p = system.production;
       el("market-action").innerHTML =
         this.selectedInvestment && isContent(this.selectedInvestment)
-          ? `<div class="market-card"><b>${contentCatalog[this.selectedInvestment].name}</b><p>${this.selectedInvestment === "kiln" ? `投入 木${economy.workshops?.kilnWood ?? 0} · 石${economy.workshops?.kilnStone ?? 0} · レンガ${economy.workshops?.brick ?? 0}。近づくと木・石を投入し、出荷係が市場へ運びます。` : this.selectedInvestment === "orchard" ? `実の在庫 ${economy.workshops?.food ?? 0}。近づいて受け取れます。` : this.selectedInvestment === "minerCamp" ? `石の在庫 ${economy.workshops?.stone ?? 0}。近づいて受け取れます。` : this.selectedInvestment === "shrine" ? (economy.bossDefeated ? "守護獣を討伐済み。祠に灯りが戻りました。" : "修復すると大型の守護獣が現れます。地面の予兆から離れて戦おう。") : contentCatalog[this.selectedInvestment].benefit}</p>${this.selectedInvestment === "splitter" && system.content("splitter") ? `<div class="route-options"><button data-board-route="build" aria-pressed="${economy.boardRoute !== "market"}">建築へ</button><button data-board-route="market" aria-pressed="${economy.boardRoute === "market"}">市場へ</button></div>` : ""}${this.selectedInvestment === "portal" && system.content("portal") ? `<button id="stage-travel">${getStage(this.model.stage.destination).name}へ渡る</button><p>設備と建築進行は群島ごとに保存されます。</p>` : ""}</div>`
+          ? `<div class="market-card"><b>${contentCatalog[this.selectedInvestment].name}</b><p>${this.selectedInvestment === "kiln" ? `投入 木${economy.workshops?.kilnWood ?? 0} · 石${economy.workshops?.kilnStone ?? 0} · レンガ${economy.workshops?.brick ?? 0}。近づくと木・石を投入し、出荷係が市場へ運びます。` : this.selectedInvestment === "orchard" ? `実の在庫 ${economy.workshops?.food ?? 0}。近づいて受け取れます。` : this.selectedInvestment === "minerCamp" ? `石の在庫 ${economy.workshops?.stone ?? 0}。近づいて受け取れます。` : this.selectedInvestment === "shrine" ? (economy.bossDefeated ? "守護獣を討伐済み。祠に灯りが戻りました。" : "修復すると大型の守護獣が現れます。地面の予兆から離れて戦おう。") : contentCatalog[this.selectedInvestment].benefit}</p>${this.selectedInvestment === "splitter" && system.content("splitter") ? `<div class="route-options"><button data-board-route="build" aria-pressed="${economy.boardRoute !== "market"}">建築へ</button><button data-board-route="market" aria-pressed="${economy.boardRoute === "market"}">市場へ</button></div>` : ""}${this.selectedInvestment === "portal" && system.content("portal") ? `<button id="stage-travel">${getStage(this.model.stage.destination).name}へ渡る</button><p>別の群島を選ぶ（設備・建築・在庫は群島ごとに保存）</p><div class="route-options" style="flex-wrap:wrap">${stageDestinations(this.model.stage).filter((stage) => stage.id !== this.model.stage.destination).map((stage) => `<button data-stage-travel="${stage.id}">${stage.name}${this.model.s.worlds?.[stage.id]?.won ? " ✓" : ""}</button>`).join("")}</div>` : ""}</div>`
           : this.selectedInvestment === "drill"
             ? `<div class="market-card"><b>採掘機の石材 ${economy.drillStock ?? 0} / 500</b><p>岩が戻るたびに掘ります。近づくと石材を受け取れます。</p></div>`
             : this.selectedInvestment === "collector"
