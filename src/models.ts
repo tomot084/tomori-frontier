@@ -271,11 +271,25 @@ export class Art {
     return this.merge(name, parts);
   }
   brick(name: string, w = 0.55, h = 0.26, d = 0.35) {
-    const mesh = this.box(name, 0, 0, 0, w, h, d, 0xbd593e);
-    return this.paintItem(mesh, (_x, _y, _z, nx, ny) =>
-      ny > 0.65 ? 0xf09b6a : ny < -0.65 ? 0x964a35
-        : Math.abs(nx) > 0.65 ? 0xd77b55 : 0xb95e42,
+    // A pressed clay brick with a beveled rim and a recessed bed on top.
+    const profile = [
+      [0, -0.5], [0.89, -0.5], [1, -0.33], [1, 0.31], [0.90, 0.5],
+      [0.62, 0.5], [0.49, 0.26], [0, 0.26],
+    ];
+    const mesh = MeshBuilder.CreateLathe(name, {
+      shape: profile.map(([radius, y]) => new Vector3(radius * Math.SQRT1_2, y, 0)),
+      tessellation: 4,
+    }, this.scene).convertToFlatShadedMesh();
+    mesh.bakeTransformIntoVertices(
+      Matrix.RotationY(Math.PI / 4).multiply(Matrix.Scaling(w, h, d)),
     );
+    this.tint(mesh, 0xbd593e);
+    return this.paintItem(mesh, (x, y, z, nx, ny) => {
+      if (ny < -0.65) return 0x964a35;
+      if (Math.max(Math.abs(x) / w, Math.abs(z) / d) < 0.30 && y < h * 0.45)
+        return 0xbb593e;
+      return ny > 0.42 ? 0xf09b6a : Math.abs(nx) > 0.65 ? 0xd77b55 : 0xc36b49;
+    });
   }
   stonePiece(name: string, size = 0.32) {
     // A chipped stone with several broad planar faces, distinct from timber.
@@ -519,35 +533,103 @@ export class Art {
     const [base, face] = shades[this.biome] ?? [0x708e9d, 0xc3dce1];
     const ore = this.biome === "volcano" ? 0xffb258 :
       this.biome === "desert" ? 0xffdb77 : this.biome === "ice" ? 0xc2f9ff : 0xc7eee5;
-    const main = this.rock("ore-boulder", 1.70, base, seed);
-    const shoulder = this.rock("ore-shoulder", 0.95, face, seed + 2);
-    shoulder.position.set(-0.46, 0.12, 0.17);
+    const main = this.rock("ore-boulder", 1.73, base, seed);
+    main.scaling.y = 0.79;
+    const shoulder = this.rock("ore-shoulder", 0.87, base, seed + 2);
+    shoulder.position.set(-0.53, 0.02, 0.24);
     const parts = [main, shoulder];
-    // A cluster with broad bright crystal faces, not tiny vein decoration.
-    for (const [x, z, height, tilt] of [
-      [-0.27, -0.30, 0.64, 0.29], [0.16, -0.16, 0.91, -0.13], [0.47, 0.07, 0.55, -0.37],
+    for (const [x, y, z, height, width, lean, tilt] of [
+      [-0.34, 0.84, 0.01, 0.74, 0.23, 0.16, 0.32],
+      [0.09, 0.94, -0.06, 1.00, 0.26, -0.12, -0.08],
+      [0.43, 0.69, 0.26, 0.62, 0.22, 0.24, -0.39],
+      [-0.41, 0.46, 0.46, 0.38, 0.13, 0.48, 0.34],
     ]) {
-      const gem = this.cylinder("ore-crystal", x, 0.78 + height * 0.20, z, 0.10, 0.19, height * 0.72, ore, 12);
-      gem.rotation.z = tilt;
-      const tip = this.cylinder("ore-crystal-tip", x - Math.sin(tilt) * height * 0.45,
-        0.78 + height * 0.64, z, 0.005, 0.10, height * 0.28, face, 12);
-      tip.rotation.z = tilt;
-      parts.push(gem, tip);
+      const shape = [[0.74, -0.30], [1, 0.06], [0.90, 0.69], [0, 1]];
+      const gem = MeshBuilder.CreateLathe("ore-crystal", {
+        shape: shape.map(([radius, h]) => new Vector3(radius * width, h * height, 0)),
+        tessellation: 6,
+      }, this.scene).convertToFlatShadedMesh();
+      gem.position.set(x, y, z);
+      gem.rotation.set(lean, noise(seed) * 0.8, tilt);
+      this.tint(gem, ore);
+      parts.push(this.paintItem(gem, (_x, _y, _z, nx, ny, nz) =>
+        ny > 0.08 || nx + nz > 0.48 ? ore : face,
+      ));
     }
     return this.merge("split-moonstone", parts);
   }
+
+  /** A folded leaf with a raised midrib and a pointed tip. */
+  private fruitLeaf(name: string, w: number, length: number, dark: number, light: number) {
+    const positions = [
+      0, 0, 0,
+      -w * 0.5, length * 0.11, length * 0.43,
+      0, length * 0.28, length * 0.49,
+      w * 0.5, length * 0.13, length * 0.45,
+      -w * 0.26, length * 0.10, length * 0.75,
+      0, length * 0.20, length * 0.79,
+      w * 0.27, length * 0.11, length * 0.74,
+      0, length * 0.025, length,
+    ];
+    const indices = [
+      0, 2, 1, 0, 3, 2,
+      1, 2, 4, 4, 2, 5, 2, 3, 6, 2, 6, 5,
+      4, 5, 7, 5, 6, 7,
+    ];
+    const normals: number[] = [];
+    VertexData.ComputeNormals(positions, indices, normals);
+    const data = new VertexData();
+    data.positions = positions;
+    data.indices = indices;
+    data.normals = normals;
+    data.uvs = new Array(16).fill(0);
+    const leaf = new Mesh(name, this.scene);
+    data.applyToMesh(leaf);
+    this.tint(leaf, light);
+    return this.paintItem(leaf, (x) => x < 0 ? dark : light);
+  }
+
+  private lampfruit(name: string, size: number, angle: number) {
+    // Broad shoulders taper into a rounded tip. The top folds around the stem.
+    const profile = [
+      [0, -0.49], [0.21, -0.45], [0.36, -0.29], [0.49, -0.02],
+      [0.48, 0.19], [0.36, 0.37], [0.19, 0.40], [0, 0.34],
+    ];
+    const fruit = MeshBuilder.CreateLathe(name, {
+      shape: profile.map(([r, y]) => new Vector3(r * size, y * size, 0)),
+      tessellation: 12,
+    }, this.scene);
+    this.tint(fruit, 0xf1713d);
+    this.paintItem(fruit, (_x, y, _z, nx, ny, nz) => {
+      if (y < -size * 0.18) return 0xb83531;
+      return ny > 0.34 || nx - nz > 0.72 ? 0xffa247 : 0xe74b32;
+    });
+    const stem = this.cylinder("fruit-stem", 0, size * 0.43, 0, size * 0.037, size * 0.05, size * 0.17, 0x705033);
+    const leaf = this.fruitLeaf("fruit-leaf", size * 0.34, size * 0.52, 0x367644, 0xa7cf60);
+    leaf.position.y = size * 0.41;
+    leaf.rotation.y = angle;
+    return this.merge(name, [fruit, stem, leaf]);
+  }
+
   berry() {
     const parts: Mesh[] = [
-      this.foliage(-0.30, 0.34, 0.02, 0.94, 0.69, 0.87, 0x286f4b, 0x69ad4e),
-      this.foliage(0.32, 0.39, 0, 0.95, 0.75, 0.87, 0x347d4b, 0x7eb74f),
-      this.foliage(0, 0.60, 0.12, 0.97, 0.72, 0.89, 0x39854b, 0x8bc858),
+      this.foliage(0, 0.30, 0, 1.43, 0.63, 1.13, 0x286f4b, 0x61a650),
     ];
-    // Four large red berries survive the small phone viewport much better
-    // than eight tiny dots. Their calyx is built into the merged bush.
-    for (const [x,y,z] of [[-0.43,0.56,-0.33],[0.40,0.62,-0.32],[0,0.91,-0.16],[0.10,0.50,0.43]]) {
-      parts.push(this.sphere("ripe-berry", x,y,z,0.34,0.37,0.34,0xe34e40));
-      parts.push(this.sphere("berry-highlight", x-0.07,y+0.09,z-0.12,0.10,0.11,0.065,0xffad80));
-      parts.push(this.sphere("berry-calyx", x,y+0.17,z,0.17,0.07,0.16,0x427c3b));
+    for (let i = 0; i < 7; i++) {
+      const direction = (i / 7) * Math.PI * 2;
+      const leaf = this.fruitLeaf("bush-leaf", 0.47, i % 2 === 0 ? 0.81 : 0.68, 0x438b52, 0x9ec85a);
+      leaf.position.y = 0.42;
+      leaf.rotation.set(-0.14, direction, 0);
+      parts.push(leaf);
+    }
+    for (const [x, y, z, size] of [
+      [-0.43, 0.59, -0.32, 0.38], [0.42, 0.62, -0.28, 0.41],
+      [-0.04, 0.86, -0.12, 0.43], [0.14, 0.55, 0.43, 0.35],
+    ]) {
+      const fruit = this.lampfruit("ripe-lampfruit", size, x * 5 + 1);
+      fruit.position.set(x, y, z);
+      fruit.rotation.z = -x * 0.5;
+      parts.push(fruit);
     }
     return this.merge("sunberry-bush", parts);
   }
@@ -557,29 +639,35 @@ export class Art {
     if (kind === "plank") return this.plank(name);
     if (kind === "brick") return this.brick(name);
     if (kind === "coin") {
-      const body = this.cylinder(name, 0, 0, 0, 0.16, 0.16, 0.066, 0xd9912d, 16);
+      const profile = [
+        [0, -0.025], [0.126, -0.025], [0.141, -0.040], [0.166, -0.034],
+        [0.175, -0.018], [0.175, 0.018], [0.166, 0.034], [0.141, 0.040],
+        [0.126, 0.025], [0, 0.025],
+      ];
+      const body = MeshBuilder.CreateLathe(name, {
+        shape: profile.map(([radius, depth]) => new Vector3(radius, depth, 0)),
+        tessellation: 16,
+      }, this.scene);
+      this.tint(body, 0xd9912d);
+      this.paintItem(body, (x, y, z) =>
+        Math.hypot(x, z) < 0.13 ? 0xd99636 : Math.abs(y) > 0.022 ? 0xffdb73 : 0xaf631f,
+      );
       body.rotation.x = Math.PI / 2;
       const parts = [body];
       for (const sign of [-1, 1]) {
-        const face = this.cylinder(
-          name + "-gold-face", 0, 0, sign * 0.036, 0.129, 0.129, 0.009, 0xffd45e, 16,
+        const stamp = this.cylinder(
+          "coin-lantern", 0, -0.004, sign * 0.033, 0.048, 0.068, 0.107, 0xffe79b,
         );
-        face.rotation.x = Math.PI / 2;
-        const stamp = this.box(
-          name + "-light-emblem", 0, 0, sign * 0.043, 0.105, 0.105, 0.009, 0xfff0ac,
+        stamp.scaling.z = 0.18;
+        parts.push(
+          stamp,
+          this.box("coin-lantern-cap", 0, 0.061, sign * 0.037, 0.11, 0.024, 0.014, 0xffe79b),
+          this.box("coin-lantern-base", 0, -0.067, sign * 0.037, 0.12, 0.027, 0.014, 0xffe79b),
         );
-        stamp.rotation.z = Math.PI / 4;
-        parts.push(face, stamp);
       }
       return this.merge(name, parts);
     }
-    const leaf = this.box("berry-leaf", 0.035, 0.135, 0, 0.17, 0.035, 0.085, 0x579d47);
-    leaf.rotation.z = 0.42;
-    return this.merge(name, [
-      this.sphere(name, -0.065, 0, 0, 0.23, 0.25, 0.22, 0xe65344),
-      this.sphere(name + "-small-berry", 0.09, -0.025, 0.035, 0.18, 0.19, 0.18, 0xf88b56),
-      leaf,
-    ]);
+    return this.lampfruit(name, 0.34, -0.9);
   }
   grass(seed: number) {
     const p: Mesh[] = [];
